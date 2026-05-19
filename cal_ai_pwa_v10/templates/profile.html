@@ -1,0 +1,381 @@
+{% extends 'base.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+
+{% set bmi = (user.weight / ((user.height / 100) ** 2))|round(1) %}
+{% if bmi < 18.5 %}{% set bmi_cat = 'Underweight' %}{% set bmi_col = 'var(--blue)' %}
+{% elif bmi < 25 %}{% set bmi_cat = 'Normal' %}{% set bmi_col = 'var(--primary)' %}
+{% elif bmi < 30 %}{% set bmi_cat = 'Overweight' %}{% set bmi_col = 'var(--accent)' %}
+{% else %}{% set bmi_cat = 'Obese' %}{% set bmi_col = 'var(--red)' %}{% endif %}
+
+<!-- Header card -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-body">
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+      <div class="avatar" style="width:60px;height:60px;font-size:1.6rem;flex-shrink:0">
+        {{ session.username[0].upper() }}
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:1.1rem;color:var(--text)">{{ session.username }}</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:.1rem">{{ user.email }}</div>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.45rem">
+          <span style="background:var(--primary-l);color:var(--primary-d);font-size:.68rem;font-weight:700;padding:.18rem .55rem;border-radius:20px">
+            {{ user.goal|title }} Weight
+          </span>
+          <span style="background:var(--blue-l);color:var(--blue);font-size:.68rem;font-weight:700;padding:.18rem .55rem;border-radius:20px">
+            {{ goal_calories }} kcal/day
+          </span>
+          {% if user.get('goal_weight') %}
+          <span style="background:var(--accent-l);color:#b45309;font-size:.68rem;font-weight:700;padding:.18rem .55rem;border-radius:20px">
+            Goal: {{ user.goal_weight }} kg
+          </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;text-align:center">
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.65rem .4rem">
+        <div style="font-size:1.15rem;font-weight:800;color:{{ bmi_col }};font-family:var(--mono)">{{ bmi }}</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">BMI</div>
+        <div style="font-size:.62rem;color:{{ bmi_col }};font-weight:600;margin-top:.1rem">{{ bmi_cat }}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.65rem .4rem">
+        <div style="font-size:1.15rem;font-weight:800;color:var(--text);font-family:var(--mono)">{{ user.weight }}</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Weight</div>
+        <div style="font-size:.62rem;color:var(--muted)">kg</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.65rem .4rem">
+        <div style="font-size:1.15rem;font-weight:800;color:var(--text);font-family:var(--mono)">{{ user.height|int }}</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Height</div>
+        <div style="font-size:.62rem;color:var(--muted)">cm</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.65rem .4rem">
+        <div style="font-size:1.15rem;font-weight:800;color:var(--text);font-family:var(--mono)">{{ user.age|int }}</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Age</div>
+        <div style="font-size:.62rem;color:var(--muted)">yrs</div>
+      </div>
+    </div>
+
+    <!-- Goal weight progress -->
+    {% if user.get('goal_weight') %}
+    {% set gw = user.goal_weight|float %}
+    {% set cw = user.weight|float %}
+    {% set start_w = user.get('start_weight', cw)|float %}
+    {% set progress = ((start_w - cw) / (start_w - gw) * 100)|round|int if (start_w - gw) != 0 else 0 %}
+    <div style="margin-top:1rem;background:var(--surface2);border-radius:var(--radius-sm);padding:.85rem 1rem;border:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">🎯 Goal Weight Progress</div>
+        <div style="font-size:.75rem;color:var(--primary);font-weight:700;font-family:var(--mono)">{{ [progress, 100]|min }}%</div>
+      </div>
+      <div class="prog-bar">
+        <div class="prog-fill" style="width:{{ [progress,0]|max }}%;background:var(--primary-g)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:.4rem">
+        <span>Current: <strong style="color:var(--text)">{{ cw }} kg</strong></span>
+        <span>Goal: <strong style="color:var(--primary)">{{ gw }} kg</strong></span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Edit Profile -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>✏️ Edit Profile</span></div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('profile') }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem">
+        <div class="form-group">
+          <label class="form-label">Age</label>
+          <input type="number" name="age" class="form-control" value="{{ user.age|int }}" min="10" max="120" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Weight (kg)</label>
+          <input type="number" step="0.1" name="weight" class="form-control" value="{{ user.weight }}" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Height (cm)</label>
+          <input type="number" name="height" class="form-control" value="{{ user.height|int }}" required/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+        <div class="form-group">
+          <label class="form-label">Gender</label>
+          <select name="gender" class="form-select">
+            <option value="male"   {{ 'selected' if user.gender=='male' }}>Male</option>
+            <option value="female" {{ 'selected' if user.gender=='female' }}>Female</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Goal</label>
+          <select name="goal" class="form-select">
+            <option value="lose"     {{ 'selected' if user.goal=='lose' }}>Lose Weight</option>
+            <option value="maintain" {{ 'selected' if user.goal=='maintain' }}>Maintain</option>
+            <option value="gain"     {{ 'selected' if user.goal=='gain' }}>Gain Weight</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Goal Weight (kg) <span style="color:var(--muted);font-weight:400;text-transform:none">— optional</span></label>
+        <input type="number" step="0.1" name="goal_weight" class="form-control" value="{{ user.get('goal_weight', '') }}" placeholder="e.g. 65"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Activity Level</label>
+        <select name="activity" class="form-select">
+          <option value="sedentary"  {{ 'selected' if user.activity=='sedentary' }}>Sedentary (desk job, no exercise)</option>
+          <option value="light"      {{ 'selected' if user.activity=='light' }}>Light (1–3 days/week)</option>
+          <option value="moderate"   {{ 'selected' if user.activity=='moderate' }}>Moderate (3–5 days/week)</option>
+          <option value="active"     {{ 'selected' if user.activity=='active' }}>Active (6–7 days/week)</option>
+          <option value="very_active"{{ 'selected' if user.activity=='very_active' }}>Very Active (athlete)</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary w-100">
+        <i class="fa fa-save"></i> Save Changes
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Security -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>🔐 Security</span></div>
+  <div class="card-body" style="display:flex;flex-direction:column;gap:.65rem">
+    <div class="profile-row" style="padding:0">
+      <div class="profile-row-icon" style="background:var(--blue-l)">🛡️</div>
+      <div style="flex:1">
+        <div class="profile-row-label">Two-Factor Authentication</div>
+        <div style="font-size:.72rem;color:{% if user.totp_enabled %}#22c55e{% else %}var(--muted){% endif %}">
+          {% if user.totp_enabled %}✅ Enabled{% else %}Not enabled{% endif %}
+        </div>
+      </div>
+      <a href="{{ url_for('setup_2fa') }}" class="btn-ghost" style="font-size:.78rem;padding:.3rem .65rem;white-space:nowrap">
+        {% if user.totp_enabled %}Manage{% else %}Enable{% endif %}
+      </a>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:.65rem">
+      <a href="{{ url_for('forgot_password') }}" class="profile-row" style="padding:0">
+        <div class="profile-row-icon" style="background:var(--accent-l)">🔑</div>
+        <div class="profile-row-label">Change Password</div>
+        <i class="fa fa-chevron-right profile-row-chevron"></i>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Meal Reminders (local notifications, no VAPID needed) -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>🔔 Meal Reminders</span></div>
+  <div class="card-body" style="display:flex;flex-direction:column;gap:.65rem">
+    <div class="toggle-wrap" onclick="document.getElementById('notifToggle').click()" style="cursor:pointer">
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:.88rem;color:var(--text)">Desktop Reminders</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:.1rem">Breakfast 7am · Lunch 12pm · Dinner 6:30pm</div>
+      </div>
+      <label class="toggle-switch" onclick="event.stopPropagation()">
+        <input type="checkbox" id="notifToggle"/>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div id="notifStatus" style="font-size:.75rem;color:var(--muted);text-align:center"></div>
+    <a href="{{ url_for('notif_settings_page') }}" style="
+      display:flex;align-items:center;justify-content:center;gap:.4rem;
+      padding:.55rem;border-radius:10px;background:var(--surface2,#0f172a);
+      color:var(--text-muted);font-size:.82rem;text-decoration:none;
+      border:1px solid var(--border)">
+      <i class="fa fa-clock"></i> Customize reminder times →
+    </a>
+  </div>
+</div>
+
+<!-- Streak & Weight Tracking -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>🔥 Streak & Progress</span></div>
+  <div class="card-body">
+    <!-- Streak -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem;margin-bottom:1rem;text-align:center">
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.75rem .4rem">
+        <div style="font-size:1.5rem;font-weight:800;color:var(--accent);font-family:var(--mono)" id="streakCurrent">—</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Current</div>
+        <div style="font-size:.68rem;color:var(--muted)">day streak 🔥</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.75rem .4rem">
+        <div style="font-size:1.5rem;font-weight:800;color:var(--primary);font-family:var(--mono)" id="streakLongest">—</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Longest</div>
+        <div style="font-size:.68rem;color:var(--muted)">best streak 🏆</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:.75rem .4rem">
+        <div style="font-size:1.5rem;font-weight:800;color:var(--blue);font-family:var(--mono)" id="streakTotal">—</div>
+        <div style="font-size:.62rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Total</div>
+        <div style="font-size:.68rem;color:var(--muted)">days logged 📅</div>
+      </div>
+    </div>
+    <!-- Weight Log -->
+    <div style="border-top:1px solid var(--border);padding-top:.85rem">
+      <div style="font-weight:700;font-size:.88rem;color:var(--text);margin-bottom:.55rem">⚖️ Log Today's Weight</div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input type="number" id="weightInput" step="0.1" min="20" max="500"
+               placeholder="{{ user.weight }} kg" class="form-control" style="max-width:130px"/>
+        <button class="btn-primary" onclick="logWeight()" style="padding:.6rem 1rem;white-space:nowrap">
+          <i class="fa fa-save"></i> Save
+        </button>
+      </div>
+      <div style="margin-top:.85rem;position:relative;height:140px">
+        <canvas id="weightChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>📥 Export Data</span></div>
+  <div class="card-body" style="display:flex;gap:.65rem;flex-wrap:wrap">
+    <a href="/api/export/csv" class="btn-ghost" style="font-size:.83rem;text-decoration:none;flex:1;text-align:center">
+      <i class="fa fa-file-csv"></i> Download CSV
+    </a>
+    <a href="/api/export/pdf" class="btn-ghost" style="font-size:.83rem;text-decoration:none;flex:1;text-align:center">
+      <i class="fa fa-file-pdf"></i> Download PDF
+    </a>
+  </div>
+</div>
+
+<!-- App Settings -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>⚙️ App Settings</span></div>
+  <div>
+    <div class="profile-row" style="cursor:pointer" onclick="toggleTheme()">
+      <div class="profile-row-icon" style="background:var(--surface2)">🎨</div>
+      <div class="profile-row-label">Appearance</div>
+      <div class="profile-row-value" id="themeDisplayVal">Light</div>
+      <i class="fa fa-chevron-right profile-row-chevron"></i>
+    </div>
+    <a href="{{ url_for('analytics') }}" class="profile-row">
+      <div class="profile-row-icon" style="background:var(--blue-l)">📊</div>
+      <div class="profile-row-label">View Analytics</div>
+      <i class="fa fa-chevron-right profile-row-chevron"></i>
+    </a>
+    <a href="{{ url_for('predict') }}" class="profile-row">
+      <div class="profile-row-icon" style="background:var(--purple-l)">🧠</div>
+      <div class="profile-row-label">Calorie Calculator</div>
+      <i class="fa fa-chevron-right profile-row-chevron"></i>
+    </a>
+    <a href="{{ url_for('logout') }}" class="profile-row">
+      <div class="profile-row-icon" style="background:var(--red-l)">🚪</div>
+      <div class="profile-row-label" style="color:var(--red)">Logout</div>
+      <i class="fa fa-chevron-right profile-row-chevron"></i>
+    </a>
+  </div>
+</div>
+
+<div style="text-align:center;padding:.5rem 0 1rem;font-size:.72rem;color:var(--muted2)">Cal AI v1.0 · Built with ❤️</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Theme display ─────────────────────────────────────────────────────────────
+function updateThemeDisplay() {
+  const el = document.getElementById('themeDisplayVal');
+  if (el) el.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Dark' : 'Light';
+}
+updateThemeDisplay();
+const origToggle = window.toggleTheme;
+window.toggleTheme = function() { origToggle && origToggle(); updateThemeDisplay(); };
+
+// ── Streak ────────────────────────────────────────────────────────────────────
+fetch('/api/streak').then(r=>r.json()).then(d=>{
+  document.getElementById('streakCurrent').textContent = d.streak;
+  document.getElementById('streakLongest').textContent = d.longest;
+  document.getElementById('streakTotal').textContent   = d.total_days;
+}).catch(()=>{});
+
+// ── Weight chart ──────────────────────────────────────────────────────────────
+let weightChart;
+fetch('/api/weight').then(r=>r.json()).then(d=>{
+  const labels = d.logs.map(l=>l.d.slice(5));   // MM-DD
+  const values = d.logs.map(l=>l.w);
+  const ctx    = document.getElementById('weightChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+  const gridCol = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+  const textCol = isDark ? '#8b949e' : '#6b7280';
+
+  const datasets = [{
+    label:'Weight (kg)', data:values,
+    borderColor:'var(--primary)', backgroundColor:'rgba(29,185,84,.10)',
+    tension:.35, fill:true, pointRadius:3, pointBackgroundColor:'var(--primary)',
+  }];
+
+  if (d.goal_weight) {
+    datasets.push({
+      label:'Goal', data:Array(labels.length).fill(d.goal_weight),
+      borderColor:'rgba(251,146,60,.7)', borderDash:[5,4],
+      pointRadius:0, fill:false,
+    });
+  }
+
+  weightChart = new Chart(ctx, {
+    type:'line', data:{ labels, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display: d.goal_weight != null, labels:{color:textCol,font:{size:10}}} },
+      scales:{
+        x:{ grid:{color:gridCol}, ticks:{color:textCol,font:{size:9},maxTicksLimit:8} },
+        y:{ grid:{color:gridCol}, ticks:{color:textCol,font:{size:10}}, beginAtZero:false },
+      },
+    }
+  });
+}).catch(()=>{});
+
+async function logWeight() {
+  const w = parseFloat(document.getElementById('weightInput').value);
+  if (!w || w < 20 || w > 500) { alert('Please enter a valid weight (20–500 kg)'); return; }
+  const r = await fetch('/api/weight', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ weight: w })
+  });
+  if (r.ok) {
+    showToast && showToast('✅ Weight logged!', 'success');
+    document.getElementById('weightInput').value = '';
+    // Refresh chart
+    const d2 = await (await fetch('/api/weight')).json();
+    if (weightChart) {
+      weightChart.data.labels   = d2.logs.map(l=>l.d.slice(5));
+      weightChart.data.datasets[0].data = d2.logs.map(l=>l.w);
+      weightChart.update();
+    }
+  }
+}
+
+// ── Profile notification toggle ───────────────────────────────────────────────
+(async () => {
+  const toggle = document.getElementById('notifToggle');
+  const status = document.getElementById('notifStatus');
+  if (!toggle) return;
+
+  // Sync initial state
+  const isSubscribed = await window.CalPush?.isSubscribed();
+  toggle.checked = !!isSubscribed;
+  status.textContent = isSubscribed ? '✅ Reminders active: 7am · 12pm · 6:30pm' : '';
+
+  toggle.addEventListener('change', async () => {
+    if (toggle.checked) {
+      status.textContent = '⏳ Enabling...';
+      const result = await window.CalPush?.subscribe();
+      const ok = result === true || result?.ok === true;
+      toggle.checked = ok;
+      calSyncToggles(ok);
+      status.textContent = ok
+        ? '✅ Reminders active: 7am · 12pm · 6:30pm'
+        : '❌ ' + (result?.reason || 'Failed — check browser notification permission');
+    } else {
+      await window.CalPush?.unsubscribe();
+      calSyncToggles(false);
+      status.textContent = '🔕 Reminders disabled';
+    }
+  });
+})();
+
+</script>
+{% endblock %}

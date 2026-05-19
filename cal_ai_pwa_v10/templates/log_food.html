@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% block title %}Log Food{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:1rem">
+  <div style="font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-.02em">✏️ Log Food</div>
+  <div style="font-size:.8rem;color:var(--muted);margin-top:.15rem">Search or browse the food database to log your meals</div>
+</div>
+
+<div id="offlineLogBanner" style="display:none;background:linear-gradient(90deg,#b45309,#d97706);color:#fff;
+  font-size:.8rem;font-weight:600;padding:.45rem .85rem;border-radius:var(--radius-sm);margin-bottom:.75rem">
+  <i class="fa fa-wifi-slash"></i> Offline — food will be queued and synced when you reconnect
+</div>
+<div id="pendingBanner" style="display:none;background:var(--primary-l);color:var(--primary-d);
+  font-size:.8rem;font-weight:600;padding:.45rem .85rem;border-radius:var(--radius-sm);margin-bottom:.75rem">
+  <i class="fa fa-clock"></i> <span id="pendingCount">0</span> food log(s) pending sync
+</div>
+
+<div style="margin-bottom:.75rem">
+  <div class="search-wrap">
+    <i class="fa fa-search si"></i>
+    <input type="text" id="food-search" class="form-control"
+           placeholder="Search foods… (e.g. chicken, rice, apple)"
+           value="{{ query }}" autocomplete="off"/>
+  </div>
+</div>
+
+<div class="category-pills" id="catPills">
+  <span class="cat-pill active" data-cat="">All</span>
+  {% for cat in categories %}
+  <span class="cat-pill" data-cat="{{ cat.category }}">{{ cat.category }}</span>
+  {% endfor %}
+</div>
+
+{% if suggestions and not query %}
+<div id="suggestionsWrap" style="margin-bottom:1rem">
+  <div class="section-title">⭐ Your Frequent Foods</div>
+  <div class="card">
+    {% for food in suggestions %}
+    <div class="food-item" onclick="selectFood({{ food.id }},'{{ food.name|replace("'","\\'") }}',{{ food.calories }},{{ food.protein }},{{ food.carbs }},{{ food.fat }})">
+      <div class="food-icon">{{ '🇵🇭' if food.category=='Filipino' else '🍽️' }}</div>
+      <div style="flex:1">
+        <div class="food-name">{{ food.name }}</div>
+        <div class="food-meta">{{ food.category }} · {{ food.protein }}g P · {{ food.carbs }}g C · {{ food.fat }}g F</div>
+      </div>
+      <div class="food-cal">{{ food.calories }}<small style="font-weight:400;font-size:.7rem;color:var(--muted)"> kcal</small></div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="section-title" id="resultsTitle">📋 Food Database</div>
+<div class="card" id="food-results">
+  {% if foods %}
+    {% for food in foods %}
+    <div class="food-item" onclick="selectFood({{ food.id }},'{{ food.name|replace("'","\\'") }}',{{ food.calories }},{{ food.protein }},{{ food.carbs }},{{ food.fat }})">
+      <div class="food-icon">
+        {% if food.category == 'Filipino' %}🇵🇭{% elif food.category == 'Fruits' %}🍎
+        {% elif food.category == 'Vegetables' %}🥦{% elif food.category == 'Protein' %}🍗
+        {% elif food.category == 'Grains' %}🍚{% elif food.category == 'Dairy' %}🥛
+        {% elif food.category == 'Snacks' %}🍿{% elif food.category == 'Beverages' %}🥤
+        {% else %}🍽️{% endif %}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="food-name">{{ food.name }}</div>
+        <div class="food-meta">{{ food.protein }}g P · {{ food.carbs }}g C · {{ food.fat }}g F</div>
+      </div>
+      <div class="food-cal">{{ food.calories }}<small style="font-weight:400;font-size:.7rem;color:var(--muted)"> kcal</small></div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div style="text-align:center;padding:2.5rem 1rem">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🔍</div>
+      <div style="font-weight:600;color:var(--text2)">No results found</div>
+    </div>
+  {% endif %}
+</div>
+<div style="height:160px"></div>
+
+<div id="food-selected-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;
+     background:var(--surface);border-top:2px solid var(--primary);
+     padding:1.15rem 1.15rem calc(env(safe-area-inset-bottom) + 1.15rem);
+     box-shadow:0 -8px 30px rgba(0,0,0,.12)">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.85rem">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:800;font-size:.95rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="selected-food-name">—</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-top:.1rem" id="selected-food-macros">—</div>
+      <div style="font-size:.82rem;color:var(--primary);font-family:var(--mono);font-weight:700;margin-top:.1rem" id="selected-food-cal">—</div>
+    </div>
+    <button type="button" onclick="document.getElementById('food-selected-panel').style.display='none'"
+            style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--muted);
+                   width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+                   font-size:.85rem;flex-shrink:0;margin-left:.75rem">
+      <i class="fa fa-xmark"></i>
+    </button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem">
+    <div>
+      <label class="form-label">Grams</label>
+      <input type="number" id="log-quantity" class="form-control" value="100" min="1" step="1" oninput="updateCalPreview()"/>
+    </div>
+    <div>
+      <label class="form-label">Meal</label>
+      <select id="log-meal" class="form-select">
+        <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option selected>Snack</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:flex-end">
+      <button type="button" class="btn-primary w-100" style="padding:.78rem .5rem" onclick="submitLog()">
+        <i class="fa fa-plus"></i> Log
+      </button>
+    </div>
+  </div>
+  <div style="font-size:.75rem;color:var(--muted);margin-top:.5rem;text-align:center" id="logCalPreview"></div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/offline-auth.js"></script>
+<script>
+const CAT_ICONS={Filipino:'🇵🇭',Fruits:'🍎',Vegetables:'🥦',Protein:'🍗',Grains:'🍚',Dairy:'🥛',Snacks:'🍿',Beverages:'🥤'};
+let selectedFood=null, currentCat='', isOffline=!navigator.onLine;
+
+(async()=>{
+  if(isOffline){
+    document.getElementById('offlineLogBanner').style.display='block';
+    const sw=document.getElementById('suggestionsWrap');
+    if(sw) sw.style.display='none';
+    await renderOfflineFoods('','');
+    await populateOfflineCategories();
+  } else { seedFoodsCache(); }
+
+  if(window.OfflineAuth){
+    const p=await window.OfflineAuth.getPendingFoodLogs();
+    if(p.length){
+      document.getElementById('pendingBanner').style.display='block';
+      document.getElementById('pendingCount').textContent=p.length;
+    }
+  }
+})();
+
+window.addEventListener('online',()=>{isOffline=false; window.OfflineAuth?.syncFoodLogs();});
+window.addEventListener('offline',()=>{isOffline=true; document.getElementById('offlineLogBanner').style.display='block';});
+
+async function seedFoodsCache(){
+  try{
+    const r=await fetch('/api/foods/all',{credentials:'include'});
+    if(!r.ok) return;
+    const foods=await r.json();
+    if(foods.length) await window.OfflineAuth.cacheFoods(foods);
+  }catch{}
+}
+
+async function populateOfflineCategories(){
+  const cats=await window.OfflineAuth.getCachedCategories();
+  if(!cats.length) return;
+  const pills=document.getElementById('catPills');
+  pills.innerHTML='<span class="cat-pill active" data-cat="">All</span>'+
+    cats.map(c=>`<span class="cat-pill" data-cat="${c}">${c}</span>`).join('');
+}
+
+document.getElementById('catPills').addEventListener('click',async e=>{
+  const pill=e.target.closest('.cat-pill');
+  if(!pill) return;
+  document.querySelectorAll('.cat-pill').forEach(p=>p.classList.remove('active'));
+  pill.classList.add('active');
+  currentCat=pill.dataset.cat||'';
+  const q=document.getElementById('food-search').value.trim();
+  isOffline ? await renderOfflineFoods(q,currentCat) : await renderOnlineFoods(q,currentCat);
+});
+
+let st;
+document.getElementById('food-search').addEventListener('input',function(){
+  clearTimeout(st);
+  const q=this.value.trim();
+  st=setTimeout(async()=>{
+    isOffline ? await renderOfflineFoods(q,currentCat) : await renderOnlineFoods(q,currentCat);
+  },280);
+});
+
+async function renderOnlineFoods(q,cat){
+  try{
+    const url=q?`/api/foods/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(cat)}`
+               :`/api/foods/search?q=&category=${encodeURIComponent(cat)}`;
+    const r=await fetch(url);
+    const data=await r.json();
+    renderFoodList(data, q?`🔍 "${q}"`:(cat?`📂 ${cat}`:'📋 Food Database'));
+  }catch{ await renderOfflineFoods(q,cat); }
+}
+
+async function renderOfflineFoods(q,cat){
+  const data=await window.OfflineAuth.searchCachedFoods(q,cat);
+  renderFoodList(data, q?`🔍 "${q}"`: (cat?`📂 ${cat}`:'📋 Food Database (offline)'));
+}
+
+function renderFoodList(foods,title){
+  document.getElementById('resultsTitle').textContent=title;
+  if(!foods.length){
+    document.getElementById('food-results').innerHTML=`<div style="text-align:center;padding:2.5rem 1rem">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🔍</div>
+      <div style="font-weight:600;color:var(--text2)">No results found</div>
+      <div style="font-size:.8rem;color:var(--muted);margin-top:.25rem">Try a different keyword</div></div>`;
+    return;
+  }
+  document.getElementById('food-results').innerHTML=foods.map(f=>`
+    <div class="food-item" onclick="selectFood(${f.id},'${(f.name||'').replace(/'/g,"\'")}',${f.calories||0},${f.protein||0},${f.carbs||0},${f.fat||0})">
+      <div class="food-icon">${CAT_ICONS[f.category]||'🍽️'}</div>
+      <div style="flex:1;min-width:0">
+        <div class="food-name">${f.name}</div>
+        <div class="food-meta">${f.protein||0}g P · ${f.carbs||0}g C · ${f.fat||0}g F</div>
+      </div>
+      <div class="food-cal">${f.calories||0}<small style="font-weight:400;font-size:.7rem;color:var(--muted)"> kcal</small></div>
+    </div>`).join('');
+}
+
+function selectFood(id,name,cal,prot,carb,fat){
+  selectedFood={id,name,cal,prot,carb,fat};
+  document.getElementById('selected-food-name').textContent=name;
+  document.getElementById('selected-food-macros').textContent=`${prot}g P · ${carb}g C · ${fat}g F (per 100g)`;
+  document.getElementById('selected-food-cal').textContent=cal+' kcal per 100g';
+  document.getElementById('food-selected-panel').style.display='block';
+  updateCalPreview();
+}
+
+function updateCalPreview(){
+  if(!selectedFood) return;
+  const qty=parseFloat(document.getElementById('log-quantity').value)||100;
+  const kcal=Math.round(selectedFood.cal*qty/100);
+  const prot=Math.round(selectedFood.prot*qty/100);
+  const carb=Math.round(selectedFood.carb*qty/100);
+  const fat=Math.round(selectedFood.fat*qty/100);
+  document.getElementById('logCalPreview').textContent=`${qty}g → ${kcal} kcal · ${prot}g P · ${carb}g C · ${fat}g F`;
+}
+
+async function submitLog(){
+  if(!selectedFood) return;
+  const qty=parseFloat(document.getElementById('log-quantity').value)||100;
+  const meal=document.getElementById('log-meal').value;
+  if(isOffline){
+    const ok=await window.OfflineAuth.queueFoodLog({
+      food_id:selectedFood.id, food_name:selectedFood.name,
+      quantity:qty, meal_type:meal,
+      logged_at:new Date().toISOString().slice(0,19).replace('T',' '),
+    });
+    if(ok){
+      showToast(`✅ "${selectedFood.name}" queued offline`);
+      document.getElementById('food-selected-panel').style.display='none';
+      const p=await window.OfflineAuth.getPendingFoodLogs();
+      document.getElementById('pendingBanner').style.display='block';
+      document.getElementById('pendingCount').textContent=p.length;
+      selectedFood=null;
+    }
+  } else {
+    const form=document.createElement('form');
+    form.method='POST'; form.action='/log';
+    [['food_id',selectedFood.id],['quantity',qty],['meal',meal]].forEach(([k,v])=>{
+      const i=document.createElement('input'); i.type='hidden'; i.name=k; i.value=v;
+      form.appendChild(i);
+    });
+    document.body.appendChild(form); form.submit();
+  }
+}
+
+function showToast(msg){
+  const t=document.createElement('div');
+  t.textContent=msg;
+  Object.assign(t.style,{position:'fixed',bottom:'90px',left:'50%',transform:'translateX(-50%)',
+    background:'var(--text)',color:'var(--bg)',padding:'.55rem 1.1rem',borderRadius:'20px',
+    fontSize:'.83rem',fontWeight:'600',zIndex:'9999',whiteSpace:'nowrap',boxShadow:'0 4px 16px rgba(0,0,0,.25)'});
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2800);
+}
+</script>
+{% endblock %}

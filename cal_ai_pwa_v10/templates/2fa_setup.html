@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Two-Factor Authentication — Cal AI{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">🔐 Two-Factor Auth</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if already_enabled %}
+    <!-- ── Disable 2FA ── -->
+    <div class="alert alert-success" style="margin-bottom:1.25rem">
+      <i class="fa fa-shield-halved"></i> <strong>2FA is currently active</strong> on your account.
+    </div>
+    <p style="color:var(--muted);font-size:.9rem">
+      To disable two-factor authentication, confirm your password below.
+    </p>
+    {% if error %}<div class="alert alert-danger"><i class="fa fa-circle-exclamation"></i> {{ error }}</div>{% endif %}
+    <form method="POST">
+      <input type="hidden" name="action" value="disable">
+      <div class="form-group">
+        <label class="form-label">Your Password</label>
+        <div class="input-wrap">
+          <span class="input-icon"><i class="fa fa-lock"></i></span>
+          <input type="password" name="password" class="form-control has-icon" placeholder="••••••••" required/>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary w-100" style="background:#ef4444;justify-content:center">
+        <i class="fa fa-shield-xmark"></i> Disable 2FA
+      </button>
+    </form>
+
+    {% else %}
+    <!-- ── Enable 2FA ── -->
+    <div class="auth-tagline">Protect your account with an authenticator app.</div>
+
+    {% if error %}
+    <div class="alert alert-danger"><i class="fa fa-circle-exclamation"></i> {{ error }}</div>
+    {% endif %}
+
+    <div style="margin:1rem 0;padding:1rem;background:var(--card-bg,#1e293b);border-radius:12px;border:1px solid var(--border,#334155)">
+      <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
+        <strong style="color:var(--text)">Step 1</strong> — Install an authenticator app:<br>
+        Google Authenticator, Authy, or Microsoft Authenticator.
+      </p>
+      <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
+        <strong style="color:var(--text)">Step 2</strong> — Scan this QR code:
+      </p>
+      <div style="text-align:center;margin:.75rem 0">
+        <img src="data:image/png;base64,{{ qr }}" alt="QR Code" style="width:180px;height:180px;border-radius:8px;background:#fff;padding:8px"/>
+      </div>
+      <p style="font-size:.78rem;color:var(--muted);text-align:center;margin:.5rem 0 0">
+        Can't scan? Enter this code manually:<br>
+        <code style="color:var(--primary);font-size:.9rem;letter-spacing:.1rem">{{ secret }}</code>
+      </p>
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="action" value="enable">
+      <input type="hidden" name="secret" value="{{ secret }}">
+      <div class="form-group">
+        <label class="form-label">
+          <strong>Step 3</strong> — Enter the 6-digit code from your app
+        </label>
+        <input type="text" name="code" class="form-control" inputmode="numeric"
+               pattern="[0-9 ]*" maxlength="7" placeholder="000 000"
+               required autofocus autocomplete="one-time-code"
+               style="text-align:center;font-size:1.6rem;letter-spacing:.3rem;font-weight:700"/>
+      </div>
+      <button type="submit" class="btn-primary w-100 justify-content-center">
+        <i class="fa fa-shield-halved"></i> Enable 2FA
+      </button>
+    </form>
+    {% endif %}
+
+    <div style="text-align:center;margin-top:1.25rem;font-size:.88rem">
+      <a href="{{ url_for('profile') }}" style="color:var(--muted)">
+        <i class="fa fa-arrow-left"></i> Back to Profile
+      </a>
+    </div>
+  </div>
+</div>
+<script>
+document.querySelector('input[name=code]')?.addEventListener('input', function() {
+  let v = this.value.replace(/\D/g,'').slice(0,6);
+  this.value = v.length > 3 ? v.slice(0,3)+' '+v.slice(3) : v;
+});
+</script>
+{% endblock %}

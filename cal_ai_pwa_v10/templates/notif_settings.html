@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% block title %}Notification Settings{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem">
+  <h1 class="page-title" style="font-size:1.4rem;font-weight:700;display:flex;align-items:center;gap:.5rem">
+    🔔 Notification Settings
+  </h1>
+  <p style="color:var(--text-muted);font-size:.85rem;margin:.25rem 0 0">
+    Customize when you get meal reminders. Times are in <strong>Asia/Manila (PHT)</strong>.
+  </p>
+</div>
+
+<!-- Push toggle card -->
+<div class="card" style="margin-bottom:1.25rem;padding:1.25rem 1rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+    <div>
+      <div style="font-weight:600;font-size:.95rem">Push Notifications</div>
+      <div style="color:var(--text-muted);font-size:.8rem;margin-top:.15rem" id="notif-status-text">
+        Checking status…
+      </div>
+    </div>
+    <label class="switch" style="flex-shrink:0">
+      <input type="checkbox" id="notif-toggle">
+      <span class="slider round"></span>
+    </label>
+  </div>
+</div>
+
+<!-- My reminder times -->
+<div class="card" style="margin-bottom:1.25rem;padding:1.25rem 1rem">
+  <div style="font-weight:700;font-size:.95rem;margin-bottom:1rem">⏰ My Reminder Times</div>
+
+  <div id="user-times-form">
+    {% for id, meta in reminder_meta.items() %}
+    <div class="reminder-row" style="
+      display:flex;align-items:center;justify-content:space-between;
+      padding:.75rem 0;border-bottom:1px solid var(--border);gap:.75rem">
+      <div>
+        <div style="font-weight:600;font-size:.9rem">{{ meta.label }}</div>
+        <div style="color:var(--text-muted);font-size:.78rem">Default: {{ admin_times[id] }}</div>
+      </div>
+      <input type="time" id="time-{{ id }}" value="{{ user_times[id] }}" class="time-input" style="
+          background:var(--surface2,#0f172a);color:var(--text);
+          border:1px solid var(--border);border-radius:10px;
+          padding:.45rem .75rem;font-size:.9rem;cursor:pointer;
+          width:120px;text-align:center">
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap">
+    <button onclick="saveUserTimes()" class="btn-primary" style="flex:1;min-width:120px">
+      💾 Save My Times
+    </button>
+    <button onclick="resetToDefaults()" class="btn-secondary" style="flex:1;min-width:120px">
+      ↺ Reset to Defaults
+    </button>
+  </div>
+
+  <div id="save-status" style="
+    margin-top:.75rem;font-size:.82rem;text-align:center;
+    color:var(--green,#22c55e);display:none">
+  </div>
+</div>
+
+<!-- Send test -->
+<div class="card" style="margin-bottom:1.25rem;padding:1.25rem 1rem">
+  <div style="font-weight:700;font-size:.95rem;margin-bottom:.5rem">🧪 Test Notification</div>
+  <div style="color:var(--text-muted);font-size:.82rem;margin-bottom:.85rem">
+    Send a test push right now to make sure everything is working.
+  </div>
+  <button onclick="sendTest()" class="btn-primary" style="width:100%">
+    📨 Send Test Now
+  </button>
+</div>
+
+<!-- Admin defaults (only shown to admin user) -->
+{% if session.user_id == 1 or session.username == 'admin' %}
+<div class="card" style="margin-bottom:1.25rem;padding:1.25rem 1rem;border:1px solid var(--yellow,#f59e0b)">
+  <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem;color:var(--yellow,#f59e0b)">
+    🛡️ Admin: Global Default Times
+  </div>
+  <div style="color:var(--text-muted);font-size:.8rem;margin-bottom:1rem">
+    These are the fallback times for users who haven't set their own.
+  </div>
+
+  {% for id, meta in reminder_meta.items() %}
+  <div class="reminder-row" style="
+    display:flex;align-items:center;justify-content:space-between;
+    padding:.6rem 0;border-bottom:1px solid var(--border);gap:.75rem">
+    <div style="font-weight:600;font-size:.88rem">{{ meta.label }}</div>
+    <input type="time" id="admin-time-{{ id }}" value="{{ admin_times[id] }}" class="time-input" style="
+        background:var(--surface2,#0f172a);color:var(--text);
+        border:1px solid var(--yellow,#f59e0b);border-radius:10px;
+        padding:.4rem .65rem;font-size:.88rem;width:115px;text-align:center">
+  </div>
+  {% endfor %}
+
+  <button onclick="saveAdminDefaults()" class="btn-primary"
+    style="width:100%;margin-top:1rem;background:var(--yellow,#f59e0b);color:#1c1917">
+    💾 Save Global Defaults
+  </button>
+  <div id="admin-save-status" style="margin-top:.6rem;font-size:.82rem;text-align:center;display:none"></div>
+</div>
+{% endif %}
+
+<style>
+  /* Toggle switch */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #334155;
+    border-radius: 28px;
+    transition: .3s
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background: #fff;
+    border-radius: 50%;
+    transition: .3s
+  }
+
+  input:checked+.slider {
+    background: #22c55e
+  }
+
+  input:checked+.slider:before {
+    transform: translateX(22px)
+  }
+
+  /* Buttons */
+  .btn-primary {
+    padding: .65rem 1rem;
+    background: #22c55e;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: .88rem;
+    cursor: pointer;
+    transition: opacity .15s
+  }
+
+  .btn-primary:hover {
+    opacity: .85
+  }
+
+  .btn-secondary {
+    padding: .65rem 1rem;
+    background: var(--surface2, #1e293b);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: .88rem;
+    cursor: pointer;
+    transition: opacity .15s
+  }
+
+  .btn-secondary:hover {
+    opacity: .75
+  }
+
+  /* time input color fix for iOS */
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: .6
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const MEAL_IDS = ['breakfast', 'lunch', 'dinner', 'summary'];
+  const ADMIN_DEFAULTS = {{ admin_times | tojson }};
+
+  // ── Push toggle status ────────────────────────────────────────────────────────
+  (async () => {
+    const toggle = document.getElementById('notif-toggle');
+    const statusText = document.getElementById('notif-status-text');
+    const subscribed = await window.CalPush?.isSubscribed();
+    toggle.checked = !!subscribed;
+    statusText.textContent = subscribed
+      ? '✅ Enabled — you will receive meal reminders'
+      : '🔕 Disabled — enable to get meal reminders';
+
+    toggle.addEventListener('change', async () => {
+      if (toggle.checked) {
+        statusText.textContent = '⏳ Enabling...';
+        const result = await window.CalPush?.subscribe();
+        const ok = result === true || result?.ok === true;
+        toggle.checked = ok;
+        statusText.textContent = ok
+          ? '✅ Enabled — you will receive meal reminders'
+          : '🔕 ' + (result?.reason || 'Failed');
+      } else {
+        await window.CalPush?.unsubscribe();
+        statusText.textContent = '🔕 Disabled — enable to get meal reminders';
+      }
+    });
+  })();
+
+  // ── Save user times ────────────────────────────────────────────────────────────
+  async function saveUserTimes() {
+    const payload = {};
+    MEAL_IDS.forEach(id => {
+      payload[id] = document.getElementById('time-' + id).value || ADMIN_DEFAULTS[id];
+    });
+    const r = await fetch('/api/push/reminder-times', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      credentials: 'include',
+    });
+    const status = document.getElementById('save-status');
+    if (r.ok) {
+      status.textContent = '✅ Reminder times saved!';
+      status.style.color = 'var(--green,#22c55e)';
+    } else {
+      status.textContent = '❌ Failed to save. Try again.';
+      status.style.color = 'var(--red,#f87171)';
+    }
+    status.style.display = 'block';
+    setTimeout(() => status.style.display = 'none', 3000);
+  }
+
+  // ── Reset to admin defaults ────────────────────────────────────────────────────
+  function resetToDefaults() {
+    MEAL_IDS.forEach(id => {
+      document.getElementById('time-' + id).value = ADMIN_DEFAULTS[id];
+    });
+    showToast('↺ Reset to default times — click Save to apply', 'info');
+  }
+
+  // ── Send test ─────────────────────────────────────────────────────────────────
+  async function sendTest() {
+    const subscribed = await window.CalPush?.isSubscribed();
+    if (!subscribed) {
+      showToast('⚠️ Enable notifications first!', 'warning');
+      return;
+    }
+    await fetch('/api/push/send-test', { method: 'POST', credentials: 'include' });
+  }
+
+  // ── Admin: save global defaults ────────────────────────────────────────────────
+  async function saveAdminDefaults() {
+    const payload = {};
+    MEAL_IDS.forEach(id => {
+      payload[id] = document.getElementById('admin-time-' + id).value || ADMIN_DEFAULTS[id];
+    });
+    const r = await fetch('/api/push/admin-defaults', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      credentials: 'include',
+    });
+    const status = document.getElementById('admin-save-status');
+    if (r.ok) {
+      status.textContent = '✅ Global defaults saved!';
+      status.style.color = 'var(--green,#22c55e)';
+    } else {
+      status.textContent = '❌ Failed. Are you admin?';
+      status.style.color = 'var(--red,#f87171)';
+    }
+    status.style.display = 'block';
+    setTimeout(() => status.style.display = 'none', 3000);
+  }
+</script>
+{% endblock %}

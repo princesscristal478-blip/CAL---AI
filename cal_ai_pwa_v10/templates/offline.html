@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Offline — Cal AI{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;padding:2rem;text-align:center">
+  <div>
+    <div style="font-size:4rem;margin-bottom:1rem">📴</div>
+    <h2 style="color:var(--text,#f1f5f9);margin-bottom:.5rem">You're offline</h2>
+    <p style="color:var(--muted,#94a3b8);max-width:320px;margin:0 auto 1.5rem">
+      No internet connection. Your cached data is still available — you can browse
+      previously loaded pages and log food; everything will sync when you're back online.
+    </p>
+    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap">
+      <a href="/dashboard" class="btn-primary">📊 Dashboard</a>
+      <button onclick="location.reload()" class="btn-ghost">🔄 Try Again</button>
+    </div>
+    <p style="margin-top:2rem;font-size:.8rem;color:var(--muted,#64748b)">
+      Cal AI will automatically sync any offline changes once connectivity is restored.
+    </p>
+  </div>
+</div>
+{% endblock %}

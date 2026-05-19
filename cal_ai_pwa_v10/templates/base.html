@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="theme-color" content="#1db954"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Cal AI"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png"/>
+  <title>{% block title %}Cal AI{% endblock %} · Cal AI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="/static/css/app.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  {% block extra_css %}{% endblock %}
+  <script>
+    (function(){
+      const t = localStorage.getItem('cal-ai-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+
+{% if session.user_id %}
+<!-- ── Desktop Sidebar ───────────────────────────── -->
+<nav class="side-nav" style="display:none" id="sideNav">
+  <a href="{{ url_for('dashboard') }}" class="nav-logo" style="text-decoration:none">
+    <div class="nav-logo-mark">🥗</div>
+    <span>Cal AI</span>
+  </a>
+  <div class="nav-links">
+    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">
+      <i class="fa fa-gauge-high fa-fw"></i> Dashboard</a>
+    <a href="{{ url_for('scan') }}" class="{{ 'active' if request.endpoint=='scan' }}">
+      <i class="fa fa-camera fa-fw"></i> AI Scanner</a>
+    <a href="{{ url_for('log_food') }}" class="{{ 'active' if request.endpoint=='log_food' }}">
+      <i class="fa fa-utensils fa-fw"></i> Log Food</a>
+    <a href="{{ url_for('planner') }}" class="{{ 'active' if request.endpoint=='planner' }}">
+      <i class="fa fa-calendar-check fa-fw"></i> Meal Planner</a>
+    <a href="{{ url_for('analytics') }}" class="{{ 'active' if request.endpoint=='analytics' }}">
+      <i class="fa fa-chart-line fa-fw"></i> Analytics</a>
+    <a href="{{ url_for('predict') }}" class="{{ 'active' if request.endpoint=='predict' }}">
+      <i class="fa fa-brain fa-fw"></i> Calorie Calc</a>
+    <a href="{{ url_for('profile') }}" class="{{ 'active' if request.endpoint=='profile' }}">
+      <i class="fa fa-user fa-fw"></i> Profile</a>
+    <a href="{{ url_for('notif_settings_page') }}" class="{{ 'active' if request.endpoint=='notif_settings_page' }}">
+      <i class="fa fa-bell fa-fw"></i> Notifications</a>
+  </div>
+  <div class="nav-footer">
+    <button class="theme-toggle-btn" onclick="toggleTheme()" id="themeBtn">
+      <i class="fa fa-moon" id="themeIcon"></i>
+      <span id="themeLabel">Dark Mode</span>
+    </button>
+    <div style="display:flex;align-items:center;gap:.6rem;margin-top:.5rem">
+      <div class="avatar" style="width:34px;height:34px;font-size:.9rem">{{ session.username[0].upper() }}</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:600;color:var(--text)">{{ session.username }}</div>
+        <a href="{{ url_for('logout') }}" style="color:var(--red);font-size:.75rem;text-decoration:none">
+          <i class="fa fa-sign-out-alt"></i> Logout
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Mobile Top Nav ────────────────────────────── -->
+<nav class="top-nav" id="topNav">
+  <a href="{{ url_for('dashboard') }}" class="nav-logo" style="text-decoration:none">
+    <div class="nav-logo-mark">🥗</div>
+    <span>Cal AI</span>
+  </a>
+  <div class="nav-right">
+    <button class="btn-icon" id="notifBell" onclick="openNotifDrawer()" title="Notifications">
+      <i class="fa fa-bell"></i>
+      <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+    </button>
+    <button class="btn-icon" onclick="toggleTheme()" id="themeBtnMobile">
+      <i class="fa fa-moon" id="themeIconMobile"></i>
+    </button>
+    <div class="avatar" style="width:34px;height:34px;font-size:.9rem">{{ session.username[0].upper() }}</div>
+  </div>
+</nav>
+{% endif %}
+
+<div class="{% if session.user_id %}app-shell{% endif %}">
+  <div class="page-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const flashMsgs = {{ messages | tojson }};
+        flashMsgs.forEach(function([cat, msg], i) {
+          setTimeout(function() {
+            const iconMap = { success: 'fa-circle-check', danger: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+            const colorMap = { success: '#1db954', danger: '#f87171', warning: '#f59e0b', info: '#60a5fa' };
+            const t = document.createElement('div');
+            t.style.cssText = [
+              'position:fixed', 'top:' + (1 + i * 4.5) + 'rem', 'right:1rem',
+              'z-index:99999', 'max-width:320px', 'min-width:220px',
+              'background:var(--surface)', 'border-left:4px solid ' + (colorMap[cat] || '#60a5fa'),
+              'border-radius:10px', 'box-shadow:0 4px 20px rgba(0,0,0,.25)',
+              'padding:.75rem 1rem', 'font-size:.85rem', 'display:flex',
+              'align-items:flex-start', 'gap:.6rem', 'opacity:0',
+              'transition:all .35s cubic-bezier(.22,.61,.36,1)',
+              'transform:translateX(120%)', 'cursor:pointer'
+            ].join(';');
+            t.innerHTML = '<i class="fa ' + (iconMap[cat]||'fa-circle-info') + '" style="color:' + (colorMap[cat]||'#60a5fa') + ';margin-top:.1rem;flex-shrink:0"></i>' +
+                          '<span style="color:var(--text);line-height:1.4">' + msg + '</span>';
+            document.body.appendChild(t);
+            requestAnimationFrame(function() {
+              t.style.opacity = '1';
+              t.style.transform = 'translateX(0)';
+            });
+            const dismiss = function() {
+              t.style.opacity = '0';
+              t.style.transform = 'translateX(120%)';
+              setTimeout(function() { t.remove(); }, 350);
+            };
+            t.addEventListener('click', dismiss);
+            setTimeout(dismiss, 4500);
+          }, i * 400);
+        });
+      });
+      </script>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% if session.user_id %}
+<!-- ── Mobile Bottom Nav ──────────────────────────── -->
+<nav class="bottom-nav" id="bottomNav">
+  <a href="{{ url_for('dashboard') }}" class="nav-item {{ 'active' if request.endpoint=='dashboard' }}">
+    <i class="fa fa-gauge-high"></i><span>Home</span>
+  </a>
+  <a href="{{ url_for('log_food') }}" class="nav-item {{ 'active' if request.endpoint=='log_food' }}">
+    <i class="fa fa-utensils"></i><span>Log</span>
+  </a>
+  <a href="{{ url_for('scan') }}" class="scan-fab">
+    <i class="fa fa-camera"></i>
+  </a>
+  <a href="{{ url_for('planner') }}" class="nav-item {{ 'active' if request.endpoint=='planner' }}">
+    <i class="fa fa-calendar-check"></i><span>Planner</span>
+  </a>
+  <a href="{{ url_for('profile') }}" class="nav-item {{ 'active' if request.endpoint in ['profile','analytics','notif_settings_page'] }}">
+    <i class="fa fa-user"></i><span>Profile</span>
+  </a>
+</nav>
+
+<!-- ── Notification Drawer ───────────────────────── -->
+<div id="notifBackdrop" class="notif-backdrop" onclick="closeNotifDrawer()"></div>
+<div id="notifDrawer" class="notif-drawer">
+  <div class="notif-drawer-header">
+    <span><i class="fa fa-bell" style="color:var(--primary);margin-right:.4rem"></i>Notifications</span>
+    <div style="display:flex;gap:.4rem;align-items:center">
+      <button class="btn-ghost" style="padding:.3rem .65rem;font-size:.72rem" onclick="markAllRead()">Mark all read</button>
+      <button class="btn-icon" onclick="closeNotifDrawer()"><i class="fa fa-xmark"></i></button>
+    </div>
+  </div>
+  <div class="notif-list" id="notifList">
+    <div class="notif-empty"><i class="fa fa-bell-slash fa-2x" style="opacity:.25;margin-bottom:.5rem"></i><br>No notifications yet</div>
+  </div>
+  <div class="notif-drawer-footer">
+    <div class="toggle-wrap" onclick="document.getElementById('pushToggle').click()" style="cursor:pointer">
+      <i class="fa fa-bell" style="color:var(--primary)"></i>
+      <div style="flex:1">
+        <div style="font-size:.84rem;font-weight:600;color:var(--text)">Push Notifications</div>
+        <div style="font-size:.71rem;color:var(--muted)">Get meal reminders & calorie alerts</div>
+      </div>
+      <label class="toggle-switch" onclick="event.stopPropagation()">
+        <input type="checkbox" id="pushToggle" onchange="handlePushToggle(this)"/>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ── PWA Install Banner ─────────────────────────── -->
+<div id="install-banner">
+  <div style="font-size:1.8rem">📲</div>
+  <div style="flex:1">
+    <div style="font-weight:700;font-size:.9rem;color:var(--text)">Install Cal AI</div>
+    <div style="font-size:.75rem;color:var(--muted)">Add to home screen for the best experience</div>
+  </div>
+  <button id="install-btn" class="btn-primary" style="padding:.5rem .9rem;font-size:.78rem">Install</button>
+  <button id="install-dismiss" class="btn-ghost" style="padding:.45rem .65rem;font-size:.8rem">✕</button>
+</div>
+{% endif %}
+
+<script src="/static/js/offline-auth.js"></script>
+<script src="/static/js/app.js"></script>
+
+<script>
+/* ── Responsive nav visibility ── */
+function applyNavLayout() {
+  const wide = window.innerWidth >= 768;
+  const side = document.getElementById('sideNav');
+  const top  = document.getElementById('topNav');
+  const bot  = document.getElementById('bottomNav');
+  if (side) side.style.display = wide ? 'flex' : 'none';
+  if (top)  top.style.display  = wide ? 'none' : 'flex';
+  if (bot)  bot.style.display  = wide ? 'none' : 'flex';
+}
+applyNavLayout();
+window.addEventListener('resize', applyNavLayout);
+
+/* ── Theme ── */
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('cal-ai-theme', t);
+  const isDark = t === 'dark';
+  ['themeIcon','themeIconMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.className = isDark ? 'fa fa-sun' : 'fa fa-moon'; }
+  });
+  const lbl = document.getElementById('themeLabel');
+  if (lbl) lbl.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+  // Update Chart.js grid colors if charts exist
+  if (window.Chart) {
+    Chart.defaults.color = isDark ? '#8b949e' : '#6b7280';
+    Chart.defaults.borderColor = isDark ? '#2d333b' : '#e4ece5';
+  }
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+}
+applyTheme(localStorage.getItem('cal-ai-theme') || 'light');
+
+/* ── Notifications ── */
+let notifications = JSON.parse(localStorage.getItem('cal-ai-notifs') || '[]');
+function renderNotifs() {
+  const list = document.getElementById('notifList');
+  const badge = document.getElementById('notifBadge');
+  if (!list) return;
+  const unread = notifications.filter(n => !n.read).length;
+  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'flex' : 'none'; }
+  if (!notifications.length) {
+    list.innerHTML = '<div class="notif-empty"><i class="fa fa-bell-slash fa-2x" style="opacity:.25;margin-bottom:.5rem"></i><br>No notifications yet</div>';
+    return;
+  }
+  list.innerHTML = [...notifications].reverse().map((n,i) => `
+    <div class="notif-item ${n.read?'':'notif-unread'}" onclick="readNotif(${notifications.length-1-i})">
+      <div class="notif-item-icon">${n.icon||'🔔'}</div>
+      <div class="notif-item-body">
+        <div class="notif-item-title">${n.title}</div>
+        <div class="notif-item-msg">${n.message}</div>
+        <div class="notif-item-time">${n.time}</div>
+      </div>
+    </div>`).join('');
+}
+function addNotif(title, message, icon) {
+  notifications.push({ title, message, icon: icon||'🔔', time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), read: false });
+  localStorage.setItem('cal-ai-notifs', JSON.stringify(notifications));
+  renderNotifs();
+}
+window.addNotif = addNotif; // expose so app.js (loaded separately) can call it
+function readNotif(i) { notifications[i].read = true; localStorage.setItem('cal-ai-notifs', JSON.stringify(notifications)); renderNotifs(); }
+function markAllRead() { notifications.forEach(n => n.read=true); localStorage.setItem('cal-ai-notifs', JSON.stringify(notifications)); renderNotifs(); }
+function openNotifDrawer()  { document.getElementById('notifDrawer')?.classList.add('open');    document.getElementById('notifBackdrop')?.classList.add('open'); }
+function closeNotifDrawer() { document.getElementById('notifDrawer')?.classList.remove('open'); document.getElementById('notifBackdrop')?.classList.remove('open'); }
+
+// ── Push Notification Toggle (uses CalPush VAPID from app.js) ─────────────────
+function calSyncToggles(enabled) {
+  ['pushToggle', 'notifToggle'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = enabled;
+  });
+}
+
+async function handlePushToggle(cb) {
+  if (cb.checked) {
+    const result = await window.CalPush?.subscribe();
+    const ok = result === true || result?.ok === true;
+    cb.checked = ok;
+    calSyncToggles(ok);
+    if (ok) {
+      addNotif('🔔 Reminders Enabled', 'You will get meal reminders at 7am, 12pm & 6:30pm.', '🔔');
+    } else {
+      const reason = result?.reason || 'Could not enable notifications.';
+      addNotif('⚠️ Failed', reason, '⚠️');
+    }
+  } else {
+    await window.CalPush?.unsubscribe();
+    calSyncToggles(false);
+    addNotif('🔕 Reminders Off', 'Meal reminders have been disabled.', '🔕');
+  }
+}
+
+// Auto-restore toggle state on page load
+(async () => {
+  const isSubscribed = await window.CalPush?.isSubscribed();
+  calSyncToggles(!!isSubscribed);
+})();
+
+renderNotifs();
+</script>
+{% block extra_js %}{% endblock %}
+
+<script>
+// ── Global offline redirect (only from dashboard/analytics/scan/planner) ────
+(function() {
+  // Pages that should auto-redirect to offline dashboard when connection drops.
+  // Log (/log) is intentionally excluded — it has its own offline queue support.
+  const REDIRECT_ON_OFFLINE = ['/', '/dashboard', '/analytics', '/scan', '/planner', '/predict'];
+  const path = window.location.pathname;
+  const shouldRedirect = REDIRECT_ON_OFFLINE.some(p => path === p || path === p + '/');
+  if (shouldRedirect) {
+    window.addEventListener('offline', () => {
+      window.location.replace('/offline-dashboard');
+    });
+  }
+})();
+
+// ── Cache offline credentials after successful online login ──────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  const meta = document.querySelector('meta[name="cal-cache-login"]');
+  if (!meta || !window.OfflineAuth) return;
+  const email    = meta.dataset.email    || '';
+  const password = meta.dataset.password || '';
+  if (email && password) {
+    await window.OfflineAuth.cacheSuccessfulLogin(email, password, { email });
+    console.log('[OfflineAuth] Credentials cached for offline login.');
+    meta.remove();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% block title %}Sign In — Cal AI{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">🥗 Cal AI</div>
+    <div class="auth-tagline">Track smarter with AI — eat right, feel great!</div>
+
+    {% if error %}
+    <div class="alert alert-danger"><i class="fa fa-circle-exclamation"></i> {{ error }}</div>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}" novalidate>
+
+      <div class="form-group">
+        <label class="form-label" for="login_email">Email</label>
+        <div class="input-wrap">
+          <span class="input-icon"><i class="fa fa-envelope"></i></span>
+          <input type="email" id="login_email" name="email" class="form-control has-icon"
+                 placeholder="you@email.com" required autocomplete="email"
+                 oninput="validateEmail(this,'loginEmailHint')"/>
+        </div>
+        <div class="field-hint" id="loginEmailHint"></div>
+      </div>
+
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+          <label class="form-label" for="login_pw" style="margin-bottom:0">Password</label>
+          <a href="{{ url_for('forgot_password') }}" class="forgot-link">Forgot password?</a>
+        </div>
+        <div class="input-wrap">
+          <span class="input-icon"><i class="fa fa-lock"></i></span>
+          <input type="password" id="login_pw" name="password" class="form-control has-icon has-eye"
+                 placeholder="••••••••" required autocomplete="current-password"/>
+          <button type="button" class="eye-btn" onclick="toggleEye('login_pw','eyeLogin')" tabindex="-1" aria-label="Toggle password visibility">
+            <i class="fa fa-eye" id="eyeLogin"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary w-100 justify-content-center" style="margin-top:.75rem">
+        <i class="fa fa-sign-in-alt"></i> Sign In
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:1.5rem;font-size:.88rem;color:var(--muted)">
+      Don't have an account?
+      <a href="{{ url_for('register') }}" style="color:var(--primary);font-weight:600"> Create one</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleEye(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const ico = document.getElementById(iconId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  ico.className = inp.type === 'password' ? 'fa fa-eye' : 'fa fa-eye-slash';
+}
+function validateEmail(input, hintId) {
+  const hint = document.getElementById(hintId);
+  const val = input.value.trim();
+  if (!val) { hint.textContent = ''; hint.className = 'field-hint'; input.className = 'form-control has-icon'; return; }
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  if (ok) {
+    hint.innerHTML = '<i class="fa fa-circle-check"></i> Looks good!';
+    hint.className = 'field-hint hint-ok';
+    input.className = 'form-control has-icon input-ok';
+  } else {
+    hint.innerHTML = '<i class="fa fa-triangle-exclamation"></i> Enter a valid email (e.g. you@email.com)';
+    hint.className = 'field-hint hint-err';
+    input.className = 'form-control has-icon input-error';
+  }
+}
+
+// ── Offline Login Interception ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.querySelector('form[action*="login"]');
+  if (!form) return;
+
+  // Show offline badge when network is unavailable
+  if (!navigator.onLine) {
+    const badge = document.createElement('div');
+    badge.className = 'alert alert-warning';
+    badge.style.marginBottom = '.75rem';
+    badge.innerHTML = '<i class="fa fa-wifi-slash"></i> <strong>Offline mode</strong> — using locally stored credentials';
+    form.insertAdjacentElement('beforebegin', badge);
+  }
+
+  form.addEventListener('submit', async e => {
+    // If online, let the form POST normally so the server handles auth
+    if (navigator.onLine) return;
+
+    // We're offline — intercept and verify locally
+    e.preventDefault();
+
+    const email    = document.getElementById('login_email')?.value.trim();
+    const password = document.getElementById('login_pw')?.value;
+    const btn      = form.querySelector('[type=submit]');
+
+    if (!email || !password) {
+      showError('Please enter your email and password.');
+      return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Verifying offline…';
+
+    // Wait for offline-auth.js to load (it's in base.html, this runs after DOMContentLoaded)
+    const auth = window.OfflineAuth;
+    if (!auth) {
+      showError('Offline auth module not loaded. Please reload and try again.');
+      btn.disabled = false;
+      return;
+    }
+
+    const result = await auth.attemptOfflineLogin(email, password);
+
+    if (result.ok) {
+      // Store a flag so Flask can detect this is an offline-authenticated session
+      sessionStorage.setItem('offline_user', JSON.stringify(result.user));
+      sessionStorage.setItem('offline_session', '1');
+      // Redirect to dashboard — the cached page will render with stored data
+      window.location.href = '/offline-dashboard';
+    } else {
+      showError(result.error || 'Offline login failed.');
+      btn.disabled    = false;
+      btn.textContent = 'Sign In';
+    }
+  });
+
+  function showError(msg) {
+    let el = document.getElementById('offline-error');
+    if (!el) {
+      el = document.createElement('div');
+      el.id        = 'offline-error';
+      el.className = 'alert alert-danger';
+      form.insertAdjacentElement('beforebegin', el);
+    }
+    el.innerHTML = `<i class="fa fa-circle-exclamation"></i> ${msg}`;
+  }
+});
+</script>
+{% endblock %}

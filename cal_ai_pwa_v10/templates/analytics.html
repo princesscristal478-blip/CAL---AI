@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% block title %}Analytics{% endblock %}
+{% block content %}
+
+<div id="analyticsOfflineBanner" style="display:none;background:linear-gradient(90deg,#b45309,#d97706);color:#fff;
+  font-size:.8rem;font-weight:600;padding:.45rem .85rem;border-radius:var(--radius-sm);margin-bottom:.75rem">
+  <i class="fa fa-wifi-slash"></i> Offline — showing last cached analytics
+</div>
+<div style="margin-bottom:1rem">
+  <div style="font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-.02em">📊 Analytics</div>
+  <div style="font-size:.8rem;color:var(--muted);margin-top:.15rem">Track your nutrition trends over time</div>
+</div>
+
+<!-- Period tabs -->
+<div class="tab-bar" style="margin-bottom:1rem">
+  <a class="tab-item active" id="tab-week" onclick="switchPeriod('week',this)">This Week</a>
+  <a class="tab-item" id="tab-month" onclick="switchPeriod('month',this)">This Month</a>
+  <a class="tab-item" id="tab-all" onclick="switchPeriod('all',this)">All Time</a>
+</div>
+
+<!-- Summary cards -->
+<div class="stat-grid" style="margin-bottom:1rem">
+  <div class="stat-card">
+    <div class="label">Avg Calories/Day</div>
+    <div class="value" style="color:var(--primary)" id="avgCal">—</div>
+    <div class="unit">kcal</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Days Logged</div>
+    <div class="value" id="daysLogged">—</div>
+    <div class="unit">days</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Avg Protein</div>
+    <div class="value" style="color:var(--blue)" id="avgProt">—</div>
+    <div class="unit">g/day</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Goal Calories</div>
+    <div class="value" style="color:var(--accent)">{{ goal_calories|default(2000) }}</div>
+    <div class="unit">kcal/day</div>
+  </div>
+</div>
+
+<!-- Calorie trend -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>📈 Calorie Trend</span></div>
+  <div class="card-body">
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Macro breakdown -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>🥩 Daily Macro Breakdown</span></div>
+  <div class="card-body">
+    <div class="chart-wrap"><canvas id="macroChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Full-width Donut Chart — Calories by Category -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>🍩 Calories by Category</span></div>
+  <div class="card-body">
+    {% if by_cat %}
+    <div style="display:flex;flex-direction:column;align-items:center;gap:1rem">
+      <!-- Donut + center label wrapper -->
+      <div style="position:relative;width:220px;height:220px;flex-shrink:0">
+        <canvas id="catChart" width="220" height="220"></canvas>
+        <div id="donutCenter" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+          <div style="font-size:1.35rem;font-weight:800;color:var(--primary);font-family:var(--mono)" id="donutTotal">—</div>
+          <div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em">kcal total</div>
+        </div>
+      </div>
+      <!-- Category legend rows -->
+      <div style="width:100%;display:flex;flex-direction:column;gap:.45rem" id="catLegendRows"></div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem">
+      <div style="font-size:2rem;margin-bottom:.5rem">🥗</div>
+      No food logged yet — start tracking to see your breakdown!
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Top Foods (full width) -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header"><span>🏆 Top Foods</span></div>
+  {% for food in top_foods[:6] %}
+  <div style="display:flex;align-items:center;gap:.6rem;padding:.65rem 1rem;border-bottom:1px solid var(--border)">
+    <div style="width:26px;height:26px;border-radius:8px;background:var(--primary-l);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:var(--primary);flex-shrink:0">{{ loop.index }}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:.82rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ food.name }}</div>
+      <div style="font-size:.7rem;color:var(--muted)">{{ food.freq }}× logged · {{ food.avg_cal|round|int }} kcal avg</div>
+    </div>
+    <div style="font-size:.78rem;font-weight:700;color:var(--muted);font-family:var(--mono)">{{ (food.freq * food.avg_cal)|round|int }} kcal</div>
+  </div>
+  {% else %}
+  <div style="padding:1rem;text-align:center;color:var(--muted);font-size:.8rem">No data yet</div>
+  {% endfor %}
+</div>
+
+<!-- Weekly consistency bar -->
+<div class="card">
+  <div class="card-header"><span>🗓️ 30-Day Logging Consistency</span></div>
+  <div class="card-body">
+    <div id="consistencyGrid" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+    <div style="display:flex;gap:.75rem;margin-top:.75rem;font-size:.72rem;color:var(--muted);align-items:center">
+      <div style="display:flex;align-items:center;gap:.3rem">
+        <div style="width:12px;height:12px;border-radius:3px;background:var(--primary)"></div> Logged
+      </div>
+      <div style="display:flex;align-items:center;gap:.3rem">
+        <div style="width:12px;height:12px;border-radius:3px;background:var(--border)"></div> No data
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const allTrend = {{ trend|tojson }};
+const byCat = {{ by_cat|tojson }};
+const goalCal = {{ goal_calories|default(2000) }};
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+const gridCol = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.04)';
+const tickCol = isDark ? '#8b949e' : '#9ca3af';
+const legCol  = isDark ? '#cdd9e5' : '#374151';
+
+let trendChart, macroChart;
+
+function getSlice(period) {
+  if (period === 'week')  return allTrend.slice(-7);
+  if (period === 'month') return allTrend.slice(-30);
+  return allTrend;
+}
+
+function updateStats(data) {
+  const avg = data.length ? Math.round(data.reduce((s,d)=>s+d.cal,0)/data.length) : 0;
+  const avgP = data.length ? Math.round(data.reduce((s,d)=>s+(d.prot||0),0)/data.length) : 0;
+  document.getElementById('avgCal').textContent = avg;
+  document.getElementById('daysLogged').textContent = data.filter(d=>d.cal>0).length;
+  document.getElementById('avgProt').textContent = avgP;
+}
+
+function switchPeriod(period, el) {
+  document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const data = getSlice(period);
+  updateStats(data);
+  const fmtLabel = d => {
+    const dt = new Date(d.d + 'T00:00:00');
+    return period === 'all'
+      ? dt.toLocaleDateString('en',{month:'short',day:'numeric'})
+      : dt.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+  };
+  trendChart.data.labels = data.map(fmtLabel);
+  trendChart.data.datasets[0].data = data.map(d=>d.cal);
+  trendChart.data.datasets[1].data = Array(data.length).fill(goalCal);
+  trendChart.update('active');
+  macroChart.data.labels = data.map(fmtLabel);
+  macroChart.data.datasets[0].data = data.map(d=>d.prot||0);
+  macroChart.data.datasets[1].data = data.map(d=>d.carb||0);
+  macroChart.data.datasets[2].data = data.map(d=>d.fat||0);
+  macroChart.update();
+}
+
+const chartOpts = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { color: gridCol }, ticks: { color: tickCol, maxTicksLimit: 8, font: { size: 10, family:'DM Sans' } } },
+    y: { grid: { color: gridCol }, ticks: { color: tickCol, font: { size: 10, family:'DM Sans' } } }
+  }
+};
+
+const weekData = getSlice('week');
+updateStats(weekData);
+const wLabels = weekData.map(d => new Date(d.d+'T00:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'}));
+
+// Trend chart
+trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: wLabels,
+    datasets: [{
+      label: 'Calories',
+      data: weekData.map(d=>d.cal),
+      borderColor: 'rgba(29,185,84,1)',
+      backgroundColor: 'rgba(29,185,84,.1)',
+      fill: true, tension: 0.4, borderWidth: 2, pointRadius: 5,
+      pointBackgroundColor: 'rgba(29,185,84,1)',
+    },{
+      label: 'Goal',
+      data: Array(weekData.length).fill(goalCal),
+      borderColor: 'rgba(245,158,11,.7)',
+      borderDash: [6,4], pointRadius: 0, fill: false, borderWidth: 2,
+    }]
+  },
+  options: {
+    ...chartOpts,
+    layout: { padding: { top: 28 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    animation: {
+      onComplete: function() {
+        const chart = this;
+        const ctx = chart.ctx;
+        const ds = chart.data.datasets[0];
+        const meta = chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font = 'bold 10px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        meta.data.forEach((pt, i) => {
+          const val = ds.data[i];
+          if (!val || val === 0) return;
+          const label = Math.round(val).toLocaleString();
+          const tw = ctx.measureText(label).width;
+          const px = pt.x, py = pt.y - 8;
+          const pw = tw + 10, ph = 16, pr = 5;
+          ctx.fillStyle = isDark ? 'rgba(29,185,84,.22)' : 'rgba(29,185,84,.15)';
+          ctx.beginPath();
+          ctx.roundRect(px - pw/2, py - ph, pw, ph, pr);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(29,185,84,1)';
+          ctx.fillText(label, px, py - 1);
+        });
+        ctx.restore();
+      }
+    }
+  }
+});
+
+// Macro chart
+macroChart = new Chart(document.getElementById('macroChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: wLabels,
+    datasets: [
+      { label: 'Protein', data: weekData.map(d=>d.prot||0), backgroundColor: 'rgba(96,165,250,.8)', borderRadius: 4 },
+      { label: 'Carbs',   data: weekData.map(d=>d.carb||0), backgroundColor: 'rgba(251,191,36,.8)', borderRadius: 4 },
+      { label: 'Fat',     data: weekData.map(d=>d.fat||0),  backgroundColor: 'rgba(167,139,250,.8)', borderRadius: 4 },
+    ]
+  },
+  options: {
+    ...chartOpts,
+    plugins: { legend: { labels: { color: legCol, font: { size: 11, family:'DM Sans' }, boxWidth: 12, padding: 12 } } },
+    scales: {
+      x: { stacked: true, grid: { color: gridCol }, ticks: { color: tickCol, maxTicksLimit: 8, font: { size: 10 } } },
+      y: { stacked: true, grid: { color: gridCol }, ticks: { color: tickCol, font: { size: 10 } } }
+    }
+  }
+});
+
+// ── Category Donut Chart ──────────────────────────────────────────────────────
+const catColors = ['#1db954','#60a5fa','#f59e0b','#a78bfa','#f87171','#34d399','#fb923c','#818cf8'];
+if (byCat && byCat.length && document.getElementById('catChart')) {
+  const totalCal = byCat.reduce((s, c) => s + (c.total_cal || 0), 0);
+  document.getElementById('donutTotal').textContent = Math.round(totalCal).toLocaleString();
+
+  new Chart(document.getElementById('catChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: byCat.map(c => c.category || 'Other'),
+      datasets: [{
+        data: byCat.map(c => c.total_cal),
+        backgroundColor: catColors,
+        borderWidth: 3,
+        borderColor: isDark ? '#1c2128' : '#ffffff',
+        hoverBorderWidth: 4,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      cutout: '68%',
+      animation: { animateRotate: true, duration: 700 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = Math.round(ctx.parsed / totalCal * 100);
+              return ` ${ctx.label}: ${Math.round(ctx.parsed).toLocaleString()} kcal (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Build legend rows
+  const legendEl = document.getElementById('catLegendRows');
+  if (legendEl) {
+    byCat.forEach((c, i) => {
+      const pct = totalCal > 0 ? Math.round(c.total_cal / totalCal * 100) : 0;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:.6rem';
+      row.innerHTML = `
+        <div style="width:10px;height:10px;border-radius:3px;background:${catColors[i % catColors.length]};flex-shrink:0"></div>
+        <div style="flex:1;font-size:.78rem;color:var(--text);font-weight:600">${c.category || 'Other'}</div>
+        <div style="font-size:.75rem;color:var(--muted);font-family:var(--mono)">${Math.round(c.total_cal).toLocaleString()} kcal</div>
+        <div style="width:34px;text-align:right;font-size:.72rem;font-weight:700;color:${catColors[i % catColors.length]}">${pct}%</div>
+      `;
+      legendEl.appendChild(row);
+    });
+  }
+}
+
+// Consistency grid (30 days)
+const grid = document.getElementById('consistencyGrid');
+const loggedDates = new Set(allTrend.filter(d=>d.cal>0).map(d=>d.d));
+for (let i = 29; i >= 0; i--) {
+  const dt = new Date(); dt.setDate(dt.getDate()-i);
+  const key = dt.toISOString().slice(0,10);
+  const has = loggedDates.has(key);
+  const cell = document.createElement('div');
+  cell.style.cssText = `width:20px;height:20px;border-radius:5px;background:${has?'var(--primary)':'var(--border)'};opacity:${has?1:.5};title:${key}`;
+  cell.title = key + (has?' ✓':'');
+  grid.appendChild(cell);
+}
+
+// ── Offline fallback ──────────────────────────────────────────────────────────
+if (!navigator.onLine) {
+  document.getElementById('analyticsOfflineBanner').style.display = 'block';
+}
+(async () => {
+  if (!navigator.onLine && window.OfflineAuth) {
+    const cached = await window.OfflineAuth.getCachedUserData('dashboard');
+    if (cached && (!allTrend || allTrend.every(d => d.cal === 0))) {
+      // Patch in today's cached data into the last bar of the chart
+      const today = new Date().toISOString().slice(0, 10);
+      const todayIdx = allTrend.findIndex(d => d.d === today);
+      if (todayIdx >= 0 && cached.totals) {
+        allTrend[todayIdx].cal  = Math.round(cached.totals.total_cal || 0);
+        allTrend[todayIdx].prot = Math.round(cached.totals.total_protein || 0);
+        allTrend[todayIdx].carb = Math.round(cached.totals.total_carbs || 0);
+        allTrend[todayIdx].fat  = Math.round(cached.totals.total_fat || 0);
+      }
+    }
+  }
+})();
+</script>
+{% endblock %}

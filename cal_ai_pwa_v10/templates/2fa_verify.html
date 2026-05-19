@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Two-Factor Verification — Cal AI{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card" style="text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:.25rem">🔐</div>
+    <div class="auth-logo" style="font-size:1.3rem">Two-Factor Verification</div>
+    <div class="auth-tagline">Enter the 6-digit code from your authenticator app.</div>
+
+    {% if error %}
+    <div class="alert alert-danger" style="text-align:left">
+      <i class="fa fa-circle-exclamation"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('verify_2fa', token=token) }}" novalidate>
+      <div class="form-group" style="margin:1.25rem 0">
+        <input type="text" name="code" class="form-control" inputmode="numeric" pattern="[0-9 ]*"
+               maxlength="7" placeholder="000 000" required autofocus autocomplete="one-time-code"
+               style="text-align:center;font-size:2rem;letter-spacing:.35rem;font-weight:700;padding:.75rem"/>
+      </div>
+      <button type="submit" class="btn-primary w-100 justify-content-center">
+        <i class="fa fa-shield-halved"></i> Verify
+      </button>
+    </form>
+
+    <div style="margin-top:1.5rem;font-size:.82rem;color:var(--muted)">
+      <i class="fa fa-circle-info"></i> Code refreshes every 30 seconds.<br>
+      Make sure your device clock is correct.
+    </div>
+
+    <div style="margin-top:1rem;font-size:.88rem">
+      <a href="{{ url_for('login') }}" style="color:var(--muted)">
+        <i class="fa fa-arrow-left"></i> Back to Login
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auto-format: insert space after 3 digits
+document.querySelector('input[name=code]').addEventListener('input', function() {
+  let v = this.value.replace(/\D/g, '').slice(0, 6);
+  this.value = v.length > 3 ? v.slice(0,3) + ' ' + v.slice(3) : v;
+});
+// Auto-submit when 6 digits entered
+document.querySelector('input[name=code]').addEventListener('input', function() {
+  if (this.value.replace(/\D/g,'').length === 6) {
+    setTimeout(() => this.closest('form').submit(), 200);
+  }
+});
+</script>
+{% endblock %}

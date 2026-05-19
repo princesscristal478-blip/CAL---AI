@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+{% block title %}Create Account — Cal AI{% endblock %}
+{% block content %}
+<div class="auth-wrap" style="align-items:flex-start;padding-top:1.5rem">
+  <div class="auth-card" style="max-width:520px">
+    <div class="auth-logo">🥗 Cal AI</div>
+    <div class="auth-tagline">Personalize your nutrition journey — let's get started!</div>
+
+    {% if error %}
+    <div class="alert alert-danger"><i class="fa fa-circle-exclamation"></i> {{ error }}</div>
+    {% endif %}
+
+    <form id="registerForm" method="POST" action="{{ url_for('register') }}" novalidate>
+
+      <!-- ── Account Details ── -->
+      <div class="form-section-label">🔐 Account Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="form-group">
+          <label class="form-label" for="reg_username">Username</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fa fa-user"></i></span>
+            <input type="text" id="reg_username" name="username" class="form-control has-icon"
+                   placeholder="your_name" required minlength="3"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg_email">Email</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fa fa-envelope"></i></span>
+            <input type="email" id="reg_email" name="email" class="form-control has-icon"
+                   placeholder="you@email.com" required autocomplete="email"
+                   oninput="validateEmail(this,'regEmailHint')"/>
+          </div>
+          <div class="field-hint" id="regEmailHint"></div>
+        </div>
+      </div>
+
+      <!-- Password with strength meter -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="form-group">
+          <label class="form-label" for="reg_pw">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fa fa-lock"></i></span>
+            <input type="password" id="reg_pw" name="password" class="form-control has-icon has-eye"
+                   placeholder="Min. 8 characters" required autocomplete="new-password"
+                   oninput="checkStrength(this)"/>
+            <button type="button" class="eye-btn" onclick="toggleEye('reg_pw','eyeReg1')" tabindex="-1" aria-label="Toggle password visibility">
+              <i class="fa fa-eye" id="eyeReg1"></i>
+            </button>
+          </div>
+          <!-- Strength meter -->
+          <div class="pw-strength-bar" id="strengthBar">
+            <div class="strength-seg" id="seg1"></div>
+            <div class="strength-seg" id="seg2"></div>
+            <div class="strength-seg" id="seg3"></div>
+            <div class="strength-seg" id="seg4"></div>
+          </div>
+          <div class="field-hint" id="strengthLabel"></div>
+          <!-- Requirements checklist -->
+          <div class="pw-requirements" id="pwReqs">
+            <div class="req-item" id="req-len"><i class="fa fa-circle"></i> At least 8 characters</div>
+            <div class="req-item" id="req-upper"><i class="fa fa-circle"></i> Uppercase letter (A–Z)</div>
+            <div class="req-item" id="req-lower"><i class="fa fa-circle"></i> Lowercase letter (a–z)</div>
+            <div class="req-item" id="req-num"><i class="fa fa-circle"></i> Number (0–9)</div>
+            <div class="req-item" id="req-special"><i class="fa fa-circle"></i> Special character (!@#…)</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg_confirm">Confirm Password</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fa fa-lock"></i></span>
+            <input type="password" id="reg_confirm" name="confirm_password" class="form-control has-icon has-eye"
+                   placeholder="Repeat password" required autocomplete="new-password"
+                   oninput="checkMatch()"/>
+            <button type="button" class="eye-btn" onclick="toggleEye('reg_confirm','eyeReg2')" tabindex="-1" aria-label="Toggle confirm password visibility">
+              <i class="fa fa-eye" id="eyeReg2"></i>
+            </button>
+          </div>
+          <div class="field-hint" id="matchHint"></div>
+        </div>
+      </div>
+
+      <!-- ── Body Profile ── -->
+      <div class="form-section-label" style="margin-top:.5rem">📊 Your Body Profile</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
+        <div class="form-group">
+          <label class="form-label" for="reg_age">Age</label>
+          <input type="number" id="reg_age" name="age" class="form-control" placeholder="25" min="10" max="100" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg_weight">Weight (kg)</label>
+          <input type="number" id="reg_weight" name="weight" step="0.1" class="form-control"
+                 placeholder="65" required oninput="calcCalories()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg_height">Height (cm)</label>
+          <input type="number" id="reg_height" name="height" class="form-control"
+                 placeholder="170" required oninput="calcCalories()"/>
+        </div>
+      </div>
+
+      <!-- Goal weight -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="form-group">
+          <label class="form-label" for="reg_goal_weight">Goal Weight (kg)</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fa fa-bullseye"></i></span>
+            <input type="number" id="reg_goal_weight" name="goal_weight" step="0.1"
+                   class="form-control has-icon" placeholder="60" oninput="calcCalories()"/>
+          </div>
+          <div class="field-hint hint-info" id="goalWeightHint" style="display:none">
+            <i class="fa fa-circle-info"></i> <span id="goalWeightMsg"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg_gender">Gender</label>
+          <select id="reg_gender" name="gender" class="form-select" onchange="calcCalories()">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="form-group">
+          <label class="form-label" for="reg_goal">Goal</label>
+          <select id="reg_goal" name="goal" class="form-select" onchange="calcCalories()">
+            <option value="maintain">Maintain Weight</option>
+            <option value="lose">Lose Weight</option>
+            <option value="gain">Gain Weight</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg_activity">Activity Level</label>
+          <select id="reg_activity" name="activity" class="form-select" onchange="calcCalories()">
+            <option value="sedentary">Sedentary (desk job, no exercise)</option>
+            <option value="light">Light (1–3 days/week)</option>
+            <option value="moderate" selected>Moderate (3–5 days/week)</option>
+            <option value="active">Active (6–7 days/week)</option>
+            <option value="very_active">Very Active (athlete / heavy labor)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Calorie estimate card -->
+      <div class="calorie-estimate-card" id="calorieCard" style="display:none">
+        <div class="cal-est-icon">🔥</div>
+        <div class="cal-est-body">
+          <div class="cal-est-label">Estimated Daily Calorie Goal</div>
+          <div class="cal-est-value" id="calorieEstimate">—</div>
+          <div class="cal-est-sub" id="calorieSubtext"></div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary w-100 justify-content-center" style="margin-top:1rem">
+        <i class="fa fa-user-plus"></i> Create Account
+      </button>
+      <div style="margin-top:.75rem;background:var(--bg2);border-radius:var(--radius-sm);padding:.7rem .9rem;
+                  display:flex;align-items:center;gap:.6rem;cursor:pointer"
+           onclick="document.getElementById('reg2fa').click()">
+        <input type="checkbox" id="reg2fa" name="enable_2fa" value="1"
+               style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer" onclick="event.stopPropagation()"/>
+        <div>
+          <div style="font-size:.82rem;font-weight:600;color:var(--text)">🛡️ Enable Two-Factor Authentication</div>
+          <div style="font-size:.72rem;color:var(--muted)">Optional — you can also enable this later in Profile</div>
+        </div>
+      </div>
+    </form>
+
+    <div style="text-align:center;margin-top:1.25rem;font-size:.88rem;color:var(--muted)">
+      Already have an account?
+      <a href="{{ url_for('login') }}" style="color:var(--primary);font-weight:600"> Sign in</a>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Eye toggle ── */
+function toggleEye(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const ico = document.getElementById(iconId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  ico.className = inp.type === 'password' ? 'fa fa-eye' : 'fa fa-eye-slash';
+}
+
+/* ── Email validation ── */
+function validateEmail(input, hintId) {
+  const hint = document.getElementById(hintId);
+  const val = input.value.trim();
+  if (!val) { hint.textContent = ''; hint.className = 'field-hint'; input.className = 'form-control has-icon'; return; }
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  if (ok) {
+    hint.innerHTML = '<i class="fa fa-circle-check"></i> A verification email will be sent here';
+    hint.className = 'field-hint hint-ok';
+    input.className = 'form-control has-icon input-ok';
+  } else {
+    hint.innerHTML = '<i class="fa fa-triangle-exclamation"></i> Enter a valid email (e.g. you@email.com)';
+    hint.className = 'field-hint hint-err';
+    input.className = 'form-control has-icon input-error';
+  }
+}
+
+/* ── Password strength ── */
+function checkStrength(input) {
+  const val = input.value;
+  const segs = ['seg1','seg2','seg3','seg4'].map(id => document.getElementById(id));
+  const label = document.getElementById('strengthLabel');
+  const checks = {
+    'req-len':     val.length >= 8,
+    'req-upper':   /[A-Z]/.test(val),
+    'req-lower':   /[a-z]/.test(val),
+    'req-num':     /[0-9]/.test(val),
+    'req-special': /[^A-Za-z0-9]/.test(val),
+  };
+  let score = Object.values(checks).filter(Boolean).length;
+  // Update requirement items
+  Object.entries(checks).forEach(([id, ok]) => {
+    const el = document.getElementById(id);
+    el.className = 'req-item ' + (ok ? 'req-ok' : '');
+    el.querySelector('i').className = ok ? 'fa fa-circle-check' : 'fa fa-circle';
+  });
+  // Show reqs if typing
+  document.getElementById('pwReqs').style.display = val ? 'block' : 'none';
+  // Update bar
+  const colors = ['','#ef4444','#f59e0b','#3b82f6','#22c55e'];
+  const labels = ['','Weak','Fair','Good','Strong 💪'];
+  segs.forEach((s, i) => { s.style.background = i < score ? colors[Math.max(1,score)] : 'var(--border)'; });
+  if (val) {
+    label.innerHTML = `<span style="color:${colors[Math.max(1,score)]}">${labels[Math.max(1,score)]}</span>`;
+    label.className = 'field-hint';
+  } else {
+    label.textContent = ''; label.className = 'field-hint';
+  }
+  checkMatch();
+}
+
+/* ── Confirm match ── */
+function checkMatch() {
+  const pw = document.getElementById('reg_pw').value;
+  const cf = document.getElementById('reg_confirm').value;
+  const hint = document.getElementById('matchHint');
+  const inp = document.getElementById('reg_confirm');
+  if (!cf) { hint.textContent = ''; hint.className = 'field-hint'; inp.className = 'form-control has-icon has-eye'; return; }
+  if (pw === cf) {
+    hint.innerHTML = '<i class="fa fa-circle-check"></i> Passwords match!';
+    hint.className = 'field-hint hint-ok';
+    inp.className = 'form-control has-icon has-eye input-ok';
+  } else {
+    hint.innerHTML = '<i class="fa fa-circle-xmark"></i> Passwords do not match';
+    hint.className = 'field-hint hint-err';
+    inp.className = 'form-control has-icon has-eye input-error';
+  }
+}
+
+/* ── Calorie estimator ── */
+const AF = {sedentary:1.2,light:1.375,moderate:1.55,active:1.725,very_active:1.9};
+function calcCalories() {
+  const w = parseFloat(document.getElementById('reg_weight').value);
+  const h = parseFloat(document.getElementById('reg_height').value);
+  const a = parseFloat(document.getElementById('reg_age').value || 25);
+  const g = document.getElementById('reg_gender').value;
+  const goal = document.getElementById('reg_goal').value;
+  const act = document.getElementById('reg_activity').value;
+  const goalW = parseFloat(document.getElementById('reg_goal_weight').value);
+  const card = document.getElementById('calorieCard');
+  if (!w || !h) { card.style.display = 'none'; return; }
+  let bmr = g === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
+  let tdee = bmr * (AF[act] || 1.55);
+  if (goal === 'lose') tdee -= 500;
+  else if (goal === 'gain') tdee += 500;
+  const cal = Math.round(tdee);
+  document.getElementById('calorieEstimate').textContent = cal.toLocaleString() + ' kcal / day';
+  const sub = goal === 'lose' ? `500 kcal deficit to support fat loss`
+            : goal === 'gain' ? `500 kcal surplus to support muscle gain`
+            : `Maintenance — stay at your current weight`;
+  document.getElementById('calorieSubtext').textContent = sub;
+  card.style.display = 'flex';
+  // Goal weight hint
+  const gwHint = document.getElementById('goalWeightHint');
+  const gwMsg  = document.getElementById('goalWeightMsg');
+  if (goalW && w) {
+    const diff = goalW - w;
+    const dir = diff < 0 ? `Lose ${Math.abs(diff.toFixed(1))} kg` : diff > 0 ? `Gain ${diff.toFixed(1)} kg` : 'You\'re already at your goal weight!';
+    const weeks = diff !== 0 ? ` (~${Math.abs(Math.round(diff / 0.5))} weeks at 0.5 kg/week)` : '';
+    gwMsg.textContent = dir + weeks;
+    gwHint.style.display = 'flex';
+  } else {
+    gwHint.style.display = 'none';
+  }
+}
+
+// ── Offline Register Interception ───────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('registerForm');
+  if (!form) return;
+
+  if (!navigator.onLine) {
+    const badge = document.createElement('div');
+    badge.className = 'alert alert-warning';
+    badge.style.marginBottom = '.75rem';
+    badge.innerHTML = '<i class="fa fa-wifi-slash"></i> <strong>Offline mode</strong> — your registration will be saved and synced when you reconnect';
+    form.insertAdjacentElement('beforebegin', badge);
+  }
+
+  form.addEventListener('submit', async e => {
+    if (navigator.onLine) return; // let server handle it normally
+
+    e.preventDefault();
+
+    const btn = form.querySelector('[type=submit]');
+    const pw  = document.getElementById('reg_pw')?.value || '';
+    const cpw = document.getElementById('reg_confirm')?.value || '';
+
+    if (pw !== cpw) {
+      showRegError('Passwords do not match.');
+      return;
+    }
+
+    const data = Object.fromEntries(new FormData(form).entries());
+    btn.disabled = true;
+    btn.textContent = 'Saving offline…';
+
+    const ok = await window.OfflineRegister?.queueRegistration(data);
+
+    if (ok) {
+      // Show success and redirect to offline login
+      form.insertAdjacentHTML('beforebegin',
+        '<div class="alert alert-success"><i class="fa fa-circle-check"></i> ' +
+        'Account saved offline! <strong>Log in now</strong> — it will sync to the server when you go online.</div>'
+      );
+      setTimeout(() => { window.location.href = '/offline-dashboard'; }, 2000);
+    } else {
+      showRegError('Could not save offline registration. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+    }
+  });
+
+  function showRegError(msg) {
+    let el = document.getElementById('offline-reg-error');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'offline-reg-error';
+      el.className = 'alert alert-danger';
+      form.insertAdjacentElement('beforebegin', el);
+    }
+    el.innerHTML = `<i class="fa fa-circle-exclamation"></i> ${msg}`;
+  }
+});
+</script>
+{% endblock %}

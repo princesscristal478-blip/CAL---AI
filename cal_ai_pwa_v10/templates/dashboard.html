@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% if cache_login %}
+<meta name="cal-cache-login"
+      data-email="{{ cache_login.email | e }}"
+      data-password="{{ cache_login.password | e }}">
+{% endif %}
+
+{% set cal     = (totals.total_cal    or 0)|round|int %}
+{% set prot    = (totals.total_protein or 0)|round|int %}
+{% set carbs   = (totals.total_carbs   or 0)|round|int %}
+{% set fat     = (totals.total_fat     or 0)|round|int %}
+{% set pct     = [(cal / goal_calories * 100)|round|int, 100]|min if goal_calories else 0 %}
+{% set remain  = (goal_calories - cal)|round|int %}
+{% set circ    = 251.3 %}
+{% set dash    = (pct / 100 * circ)|round(1) %}
+
+<!-- Greeting -->
+<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <div style="font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-.02em">
+      Good day, {{ session.username }}! 👋
+    </div>
+    <div style="font-size:.8rem;color:var(--muted);margin-top:.15rem">Here's your nutrition summary for today</div>
+  </div>
+</div>
+
+<!-- Calorie Ring Hero -->
+<div class="calorie-hero" style="margin-bottom:1rem">
+  <div class="ring-wrap">
+    <svg width="110" height="110" viewBox="0 0 110 110">
+      <circle cx="55" cy="55" r="40" fill="none" stroke="var(--border)" stroke-width="9"/>
+      <circle cx="55" cy="55" r="40" fill="none"
+        stroke="{{ 'var(--red)' if pct >= 100 else 'var(--primary)' }}"
+        stroke-width="9" stroke-linecap="round"
+        stroke-dasharray="{{ dash }} {{ circ }}"
+        transform="rotate(-90 55 55)"
+        style="transition:stroke-dasharray .8s ease"/>
+    </svg>
+    <div class="ring-center-text">
+      <span class="ring-pct" style="color:{{ 'var(--red)' if pct >= 100 else 'var(--primary)' }}">{{ pct }}%</span>
+    </div>
+  </div>
+  <div class="ring-stats">
+    <div class="ring-cal-big" style="color:{{ 'var(--red)' if pct >= 100 else 'var(--primary)' }}">{{ cal }}</div>
+    <div class="ring-cal-label">kcal consumed today</div>
+    <div class="ring-remain" style="color:{{ 'var(--red)' if remain < 0 else 'var(--text2)' }}">
+      {% if remain >= 0 %}
+        <span style="color:var(--primary);font-family:var(--mono);font-weight:800">{{ remain }}</span> kcal remaining
+      {% else %}
+        <span style="color:var(--red);font-family:var(--mono);font-weight:800">+{{ remain|abs }}</span> kcal over goal
+      {% endif %}
+    </div>
+    <div class="ring-row">
+      <div class="ring-row-item"><span class="rl">Goal</span><span class="rv">{{ goal_calories }}</span></div>
+      <div class="ring-row-item"><span class="rl">Food</span><span class="rv">{{ cal }}</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Macros -->
+<div class="macro-pills" style="margin-bottom:1rem">
+  <div class="macro-pill">
+    <div class="mp-val" style="color:var(--blue)">{{ prot }}<span style="font-size:.8rem">g</span></div>
+    <div class="mp-label">Protein</div>
+    <div class="mp-bar"><div class="mp-fill" style="width:{{ [(prot/150*100)|round|int,100]|min }}%;background:var(--blue)"></div></div>
+  </div>
+  <div class="macro-pill">
+    <div class="mp-val" style="color:var(--accent)">{{ carbs }}<span style="font-size:.8rem">g</span></div>
+    <div class="mp-label">Carbs</div>
+    <div class="mp-bar"><div class="mp-fill" style="width:{{ [(carbs/200*100)|round|int,100]|min }}%;background:var(--accent)"></div></div>
+  </div>
+  <div class="macro-pill">
+    <div class="mp-val" style="color:var(--purple)">{{ fat }}<span style="font-size:.8rem">g</span></div>
+    <div class="mp-label">Fat</div>
+    <div class="mp-bar"><div class="mp-fill" style="width:{{ [(fat/70*100)|round|int,100]|min }}%;background:var(--purple)"></div></div>
+  </div>
+</div>
+
+<!-- Water Tracker -->
+<div class="water-track">
+  <div class="water-header">
+    <div class="water-title"><span>💧</span> Water Intake</div>
+    <div class="water-count"><span id="waterCount">0</span> / <span id="waterGoal">8</span> glasses</div>
+  </div>
+  <div class="water-glasses" id="waterGlasses"></div>
+  <div class="water-bar"><div class="water-bar-fill" id="waterBarFill" style="width:0%"></div></div>
+  <div class="water-add-row">
+    <span class="water-label">Tap a glass to log water</span>
+    <button class="water-add-btn" onclick="resetWater()">Reset</button>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="qa-grid">
+  <a href="{{ url_for('scan') }}" class="qa-btn">
+    <div class="qa-icon" style="background:var(--primary-l)">📷</div>
+    <div><div style="font-size:.88rem;font-weight:700;color:var(--text)">Scan Food</div><div style="font-size:.72rem;color:var(--muted)">AI-powered</div></div>
+  </a>
+  <a href="{{ url_for('log_food') }}" class="qa-btn">
+    <div class="qa-icon" style="background:var(--blue-l)">✏️</div>
+    <div><div style="font-size:.88rem;font-weight:700;color:var(--text)">Log Food</div><div style="font-size:.72rem;color:var(--muted)">Manual entry</div></div>
+  </a>
+  <a href="{{ url_for('analytics') }}" class="qa-btn">
+    <div class="qa-icon" style="background:var(--purple-l)">📊</div>
+    <div><div style="font-size:.88rem;font-weight:700;color:var(--text)">Analytics</div><div style="font-size:.72rem;color:var(--muted)">View trends</div></div>
+  </a>
+  <a href="{{ url_for('planner') }}" class="qa-btn">
+    <div class="qa-icon" style="background:var(--accent-l)">🗓️</div>
+    <div><div style="font-size:.88rem;font-weight:700;color:var(--text)">Meal Plan</div><div style="font-size:.72rem;color:var(--muted)">AI-generated</div></div>
+  </a>
+</div>
+
+<!-- Weekly Chart -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="card-header">
+    <span>📈 Weekly Calories</span>
+    <a href="{{ url_for('analytics') }}" class="card-link">View all →</a>
+  </div>
+  <div class="card-body">
+    <div class="chart-wrap"><canvas id="weeklyChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Today's Food Log -->
+<div class="card">
+  <div class="card-header">
+    <span>🍽️ Today's Food Log</span>
+    <a href="{{ url_for('log_food') }}" class="card-link">+ Add food</a>
+  </div>
+
+  {% set meal_order = ['Breakfast','Lunch','Dinner','Snack'] %}
+  {% set meal_icons = {'Breakfast':'🌅','Lunch':'☀️','Dinner':'🌙','Snack':'🍎'} %}
+  {% set meal_badge = {'Breakfast':'mb-breakfast','Lunch':'mb-lunch','Dinner':'mb-dinner','Snack':'mb-snack'} %}
+
+  {% if today_logs %}
+    {% for meal_type in meal_order %}
+      {% set meal_logs = today_logs | selectattr('meal_type', 'equalto', meal_type) | list %}
+      {% if meal_logs %}
+        {% set meal_cal = meal_logs | sum(attribute='calories') %}
+        <div class="log-meal-section">
+          <div class="log-meal-header">
+            <span class="log-meal-icon">{{ meal_icons[meal_type] }}</span>
+            <span class="log-meal-title">{{ meal_type }}</span>
+            <span class="log-meal-kcal">{{ meal_logs | sum(attribute='calories') | round | int }} kcal</span>
+            <a href="{{ url_for('log_food') }}?meal={{ meal_type }}" class="log-meal-add"><i class="fa fa-plus"></i></a>
+          </div>
+          {% for log in meal_logs %}
+          <div class="log-item">
+            <div class="log-food-icon">
+              {% if log.category == 'Filipino' %}🇵🇭
+              {% elif log.category == 'Fruits' %}🍎
+              {% elif log.category == 'Vegetables' %}🥦
+              {% elif log.category == 'Protein' %}🍗
+              {% elif log.category == 'Grains' %}🍚
+              {% elif log.category == 'Dairy' %}🥛
+              {% elif log.category == 'Snacks' %}🍿
+              {% elif log.category == 'Beverages' %}🥤
+              {% else %}🍽️{% endif %}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="log-food-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.name }}</div>
+              <div class="log-food-qty">{{ log.quantity|round|int }}g</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-right:.25rem">
+              <div class="log-food-cal">{{ (log.calories * log.quantity / 100)|round|int }}</div>
+              <div style="font-size:.68rem;color:var(--muted)">kcal</div>
+            </div>
+            <form method="POST" action="{{ url_for('delete_log', log_id=log.id) }}" style="margin:0">
+              <button type="submit" style="background:none;border:none;color:var(--muted2);padding:.25rem .4rem;cursor:pointer;font-size:.82rem;border-radius:6px;transition:color .2s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">
+                <i class="fa fa-xmark"></i>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <div style="text-align:center;padding:2.5rem 1rem">
+      <div style="font-size:3rem;margin-bottom:.75rem">🍽️</div>
+      <div style="font-weight:700;font-size:.95rem;color:var(--text2)">No food logged yet</div>
+      <div style="font-size:.8rem;color:var(--muted);margin-top:.25rem">Scan or add food to get started</div>
+      <a href="{{ url_for('scan') }}" class="btn-primary w-100" style="margin-top:1.1rem;text-decoration:none">
+        <i class="fa fa-camera"></i> Scan Food
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ── Water tracker ── */
+const WATER_KEY = 'cal-ai-water-{{ now().strftime("%Y-%m-%d") if now is defined else "today" }}';
+let waterCount = parseInt(localStorage.getItem(WATER_KEY) || '0');
+const waterGoalVal = 8;
+
+function renderWater() {
+  const wrap = document.getElementById('waterGlasses');
+  const cnt  = document.getElementById('waterCount');
+  const bar  = document.getElementById('waterBarFill');
+  if (!wrap) return;
+  wrap.innerHTML = Array.from({length: waterGoalVal}, (_, i) => `
+    <button class="glass-btn ${i < waterCount ? 'filled' : ''}" onclick="toggleGlass(${i})" title="Glass ${i+1}">💧</button>
+  `).join('');
+  cnt.textContent = waterCount;
+  bar.style.width = Math.min(waterCount / waterGoalVal * 100, 100) + '%';
+}
+
+function toggleGlass(i) {
+  waterCount = (i < waterCount) ? i : i + 1;
+  localStorage.setItem(WATER_KEY, waterCount);
+  renderWater();
+
+/* ── Auto-redirect to offline dashboard when connection drops ── */
+async function goOffline() {
+  // Save latest dashboard data to IndexedDB before leaving
+  if (window.OfflineAuth) {
+    try {
+      const data = {
+        totals: {
+          total_cal:     {{ cal }},
+          total_protein: {{ prot }},
+          total_carbs:   {{ carbs }},
+          total_fat:     {{ fat }}
+        },
+        goal_calories: {{ goal_calories }},
+        today_logs: {{ today_logs | tojson }},
+        weekly: weeklyData
+      };
+      await window.OfflineAuth.cacheUserData('dashboard', data);
+      await window.OfflineAuth.cacheUserData('dashboard_ts', new Date().toISOString());
+    } catch(e) { console.warn('Cache save failed', e); }
+  }
+  window.location.replace('/offline-dashboard');
+}
+
+window.addEventListener('offline', goOffline);
+
+// Also cache on page load so data is always fresh
+window.addEventListener('load', async () => {
+  if (window.OfflineAuth) {
+    try {
+      const data = {
+        totals: {
+          total_cal:     {{ cal }},
+          total_protein: {{ prot }},
+          total_carbs:   {{ carbs }},
+          total_fat:     {{ fat }}
+        },
+        goal_calories: {{ goal_calories }},
+        today_logs: {{ today_logs | tojson }},
+        weekly: weeklyData
+      };
+      await window.OfflineAuth.cacheUserData('dashboard', data);
+      await window.OfflineAuth.cacheUserData('dashboard_ts', new Date().toISOString());
+    } catch(e) {}
+  }
+});
+}
+function resetWater() {
+  waterCount = 0;
+  localStorage.setItem(WATER_KEY, 0);
+  renderWater();
+
+/* ── Auto-redirect to offline dashboard when connection drops ── */
+async function goOffline() {
+  // Save latest dashboard data to IndexedDB before leaving
+  if (window.OfflineAuth) {
+    try {
+      const data = {
+        totals: {
+          total_cal:     {{ cal }},
+          total_protein: {{ prot }},
+          total_carbs:   {{ carbs }},
+          total_fat:     {{ fat }}
+        },
+        goal_calories: {{ goal_calories }},
+        today_logs: {{ today_logs | tojson }},
+        weekly: weeklyData
+      };
+      await window.OfflineAuth.cacheUserData('dashboard', data);
+      await window.OfflineAuth.cacheUserData('dashboard_ts', new Date().toISOString());
+    } catch(e) { console.warn('Cache save failed', e); }
+  }
+  window.location.replace('/offline-dashboard');
+}
+
+window.addEventListener('offline', goOffline);
+
+// Also cache on page load so data is always fresh
+window.addEventListener('load', async () => {
+  if (window.OfflineAuth) {
+    try {
+      const data = {
+        totals: {
+          total_cal:     {{ cal }},
+          total_protein: {{ prot }},
+          total_carbs:   {{ carbs }},
+          total_fat:     {{ fat }}
+        },
+        goal_calories: {{ goal_calories }},
+        today_logs: {{ today_logs | tojson }},
+        weekly: weeklyData
+      };
+      await window.OfflineAuth.cacheUserData('dashboard', data);
+      await window.OfflineAuth.cacheUserData('dashboard_ts', new Date().toISOString());
+    } catch(e) {}
+  }
+});
+}
+renderWater();
+
+/* ── Auto-redirect to offline dashboard when connection drops ── */
+async function goOffline() {
+  // Save latest dashboard data to IndexedDB before leaving
+  if (window.OfflineAuth) {
+    try {
+      const data = {
+        totals: {
+          total_cal:     {{ cal }},
+          total_protein: {{ prot }},
+          total_carbs:   {{ carbs }},
+          total_fat:     {{ fat }}
+        },
+        goal_calories: {{ goal_calories }},
+        today_logs: {{ today_logs | tojson }},
+        weekly: weeklyData
+      };
+      await window.OfflineAuth.cacheUserData('dashboard', data);
+      await window.OfflineAuth.cacheUserData('dashboard_ts', new Date().toISOString());
+    } catch(e) { console.warn('Cache save failed', e); }
+  }
+  window.location.replace('/offline-dashboard');
+}
+
+window.addEventListener('offline', goOffline);
+
+// Also cache on page load so data is always fresh
+window.addEventListener('load', async () => {
+  if (window.OfflineAuth) {
+    try {
+      const data = {
+        totals: {
+          total_cal:     {{ cal }},
+          total_protein: {{ prot }},
+          total_carbs:   {{ carbs }},
+          total_fat:     {{ fat }}
+        },
+        goal_calories: {{ goal_calories }},
+        today_logs: {{ today_logs | tojson }},
+        weekly: weeklyData
+      };
+      await window.OfflineAuth.cacheUserData('dashboard', data);
+      await window.OfflineAuth.cacheUserData('dashboard_ts', new Date().toISOString());
+    } catch(e) {}
+  }
+});
+
+/* ── Weekly chart ── */
+const weeklyData = {{ weekly | tojson }};
+const labels = weeklyData.map(d => {
+  const dt = new Date(d.log_date + 'T00:00:00');
+  return dt.toLocaleDateString('en', {weekday:'short'});
+});
+const cals = weeklyData.map(d => d.cal);
+const goal = {{ goal_calories }};
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+const gridCol = isDark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.04)';
+const tickCol = isDark ? '#8b949e' : '#9ca3af';
+
+const wCtx = document.getElementById('weeklyChart').getContext('2d');
+new Chart(wCtx, {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [{
+      label: 'Calories',
+      data: cals,
+      backgroundColor: cals.map(c => c > goal ? 'rgba(248,113,113,.75)' : 'rgba(29,185,84,.75)'),
+      borderRadius: 8, borderSkipped: false,
+    },{
+      label: 'Goal',
+      data: Array(labels.length).fill(goal),
+      type: 'line',
+      borderColor: 'rgba(245,158,11,.7)',
+      borderDash: [6,4],
+      pointRadius: 0, fill: false, borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridCol }, ticks: { color: tickCol, font: { size: 11, family: 'DM Sans' } } },
+      y: { grid: { color: gridCol }, ticks: { color: tickCol, font: { size: 11, family: 'DM Sans' } } }
+    }
+  }
+});
+</script>
+{% endblock %}

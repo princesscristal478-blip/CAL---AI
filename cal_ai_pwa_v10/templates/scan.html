@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% block title %}AI Food Scanner{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:1.25rem">
+  <div style="font-size:1.2rem;font-weight:800">📷 AI Food Scanner</div>
+  <div style="font-size:.82rem;color:var(--muted)">Take a photo of your food to identify calories — powered by Llama 4 Vision</div>
+</div>
+
+<!-- Groq info banner -->
+<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.85rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.65rem">
+  <span style="font-size:1.2rem;flex-shrink:0">🦙</span>
+  <div style="font-size:.78rem;color:var(--text2);line-height:1.6">
+    <strong style="color:var(--text)">Powered by Groq + Llama 4 Scout Vision</strong> — Requires a free Groq API key.<br>
+    Get yours at <a href="https://console.groq.com" target="_blank" style="color:var(--primary);font-weight:600">console.groq.com</a>, then set <code style="background:var(--border);padding:.05rem .3rem;border-radius:4px;font-size:.75rem">GROQ_API_KEY=gsk_...</code> in your <code style="background:var(--border);padding:.05rem .3rem;border-radius:4px;font-size:.75rem">.env</code> file and restart Flask.
+  </div>
+</div>
+
+<!-- Camera / Upload Box -->
+<div class="scan-box" id="scan-box" style="margin-bottom:1rem">
+  <video id="camera-feed" autoplay playsinline style="display:none;width:100%;height:100%;object-fit:cover"></video>
+  <img id="preview-img" style="display:none;width:100%;height:100%;object-fit:cover" alt="Food preview"/>
+  <div class="scan-overlay" id="scan-placeholder">
+    <div style="font-size:3rem">🍽️</div>
+    <div style="font-weight:600">Upload or use your camera</div>
+    <div style="font-size:.8rem;color:rgba(255,255,255,.6)">Supports Filipino and international foods</div>
+  </div>
+  <!-- Corner decorations -->
+  <div class="scan-corner tl"></div>
+  <div class="scan-corner tr"></div>
+  <div class="scan-corner bl"></div>
+  <div class="scan-corner br"></div>
+</div>
+
+<!-- Action Buttons -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+  <button class="btn-primary justify-content-center" onclick="startCamera()" id="cam-btn">
+    <i class="fa fa-camera"></i> Camera
+  </button>
+  <label class="btn-ghost" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem">
+    <i class="fa fa-image"></i> Upload
+    <input type="file" accept="image/*" id="file-input" style="display:none" onchange="handleUpload(event)"/>
+  </label>
+</div>
+<button class="btn-primary w-100 justify-content-center" id="scan-btn" onclick="scanFood()" style="display:none;margin-bottom:1rem">
+  <i class="fa fa-magic"></i> Analyze with AI
+</button>
+<button class="btn-ghost w-100 justify-content-center" id="capture-btn" onclick="capturePhoto()" style="display:none;margin-bottom:1rem">
+  <i class="fa fa-circle"></i> Take Photo
+</button>
+
+<!-- Loading -->
+<div id="scan-loading" style="display:none;text-align:center;padding:2rem">
+  <div class="spinner" style="margin:0 auto .75rem"></div>
+  <div style="color:var(--muted);font-size:.88rem">Identifying your food with Llama 4 Vision... 🦙</div>
+</div>
+
+<!-- Result -->
+<div id="scan-result" style="display:none" class="scan-result">
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+    <div style="font-size:2.5rem" id="result-emoji">🍽️</div>
+    <div>
+      <div style="font-weight:800;font-size:1.1rem" id="result-name">—</div>
+      <div style="font-size:.78rem;color:var(--muted)" id="result-confidence">—</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem">
+    <div style="background:var(--bg);border-radius:10px;padding:.75rem .5rem;text-align:center">
+      <div style="font-size:1.1rem;font-weight:800;color:var(--primary);font-family:var(--mono)" id="r-cal">0</div>
+      <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem">KCAL</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:.75rem .5rem;text-align:center">
+      <div style="font-size:1.1rem;font-weight:800;color:#60a5fa;font-family:var(--mono)" id="r-pro">0g</div>
+      <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem">PROTEIN</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:.75rem .5rem;text-align:center">
+      <div style="font-size:1.1rem;font-weight:800;color:#f59e0b;font-family:var(--mono)" id="r-carb">0g</div>
+      <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem">CARBS</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:.75rem .5rem;text-align:center">
+      <div style="font-size:1.1rem;font-weight:800;color:#a78bfa;font-family:var(--mono)" id="r-fat">0g</div>
+      <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem">FAT</div>
+    </div>
+  </div>
+
+  <div style="font-size:.82rem;color:var(--muted);margin-bottom:1rem" id="r-desc"></div>
+
+  <!-- Macro donut chart -->
+  <div style="margin-bottom:1rem">
+    <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">Macro Split</div>
+    <div style="max-width:180px;margin:0 auto"><canvas id="scanMacroDonut" height="180"></canvas></div>
+  </div>
+    <div>
+      <label class="form-label">Serving size (g)</label>
+      <input type="number" id="serving-size" class="form-control" value="100" min="1"/>
+    </div>
+    <div>
+      <label class="form-label">Meal</label>
+      <select id="meal-type" class="form-select">
+        <option>Breakfast</option>
+        <option>Lunch</option>
+        <option>Dinner</option>
+        <option selected>Snack</option>
+      </select>
+    </div>
+  </div>
+  <button class="btn-primary w-100 justify-content-center" onclick="logScannedFood()" style="margin-top:.75rem">
+    <i class="fa fa-plus"></i> Log This Food
+  </button>
+</div>
+
+<div id="scan-error" style="display:none" class="alert alert-danger"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let stream = null;
+let capturedImage = null;
+let scanResult = null;
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  document.getElementById('camera-feed').style.display = 'none';
+  document.getElementById('capture-btn').style.display = 'none';
+  document.getElementById('cam-btn').innerHTML = '<i class="fa fa-camera"></i> Camera';
+}
+
+async function startCamera() {
+  if (stream) { stopCamera(); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const vid = document.getElementById('camera-feed');
+    vid.srcObject = stream; vid.style.display = 'block';
+    document.getElementById('scan-placeholder').style.display = 'none';
+    document.getElementById('preview-img').style.display = 'none';
+    document.getElementById('capture-btn').style.display = 'flex';
+    document.getElementById('scan-btn').style.display = 'none';
+    document.getElementById('cam-btn').innerHTML = '<i class="fa fa-times"></i> Stop';
+  } catch (e) { showError('Cannot access camera: ' + e.message); }
+}
+
+function capturePhoto() {
+  const vid = document.getElementById('camera-feed');
+  const canvas = document.createElement('canvas');
+  canvas.width = vid.videoWidth; canvas.height = vid.videoHeight;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+  capturedImage = canvas.toDataURL('image/jpeg', 0.85);
+  document.getElementById('preview-img').src = capturedImage;
+  document.getElementById('preview-img').style.display = 'block';
+  stopCamera();
+  document.getElementById('scan-btn').style.display = 'flex';
+  document.getElementById('scan-result').style.display = 'none';
+}
+
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    capturedImage = ev.target.result;
+    document.getElementById('preview-img').src = capturedImage;
+    document.getElementById('preview-img').style.display = 'block';
+    document.getElementById('scan-placeholder').style.display = 'none';
+    document.getElementById('scan-btn').style.display = 'flex';
+    document.getElementById('scan-result').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function scanFood() {
+  if (!capturedImage) return;
+  document.getElementById('scan-loading').style.display = 'block';
+  document.getElementById('scan-result').style.display = 'none';
+  document.getElementById('scan-error').style.display = 'none';
+  document.getElementById('scan-btn').disabled = true;
+
+  try {
+    const b64 = capturedImage.split(',')[1];
+    const r = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: b64 })
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) { showError(data.error || `Server error ${r.status}`); return; }
+
+    scanResult = data;
+    showResult(data);
+  } catch (e) { showError('Network error: ' + e.message); }
+  finally {
+    document.getElementById('scan-loading').style.display = 'none';
+    document.getElementById('scan-btn').disabled = false;
+  }
+}
+
+function catEmoji(cat) {
+  const m = {'Filipino':'🇵🇭','Fruits':'🍎','Vegetables':'🥦','Protein':'🍗','Grains':'🍚','Dairy':'🥛','Snacks':'🍿','Beverages':'🥤'};
+  return m[cat] || '🍽️';
+}
+
+function showResult(d) {
+  document.getElementById('result-emoji').textContent = catEmoji(d.category);
+  document.getElementById('result-name').textContent = d.food_name;
+  document.getElementById('result-confidence').textContent =
+    `${Math.round((d.confidence||0)*100)}% confident · ${d.category || 'General'}`;
+  document.getElementById('r-cal').textContent  = d.calories_per_100g || 0;
+  document.getElementById('r-pro').textContent  = (d.protein_per_100g || 0) + 'g';
+  document.getElementById('r-carb').textContent = (d.carbs_per_100g || 0) + 'g';
+  document.getElementById('r-fat').textContent  = (d.fat_per_100g || 0) + 'g';
+  document.getElementById('r-desc').textContent = d.description || '';
+  if (d.serving_size_g) document.getElementById('serving-size').value = d.serving_size_g;
+  if (d.meal_suggestion) {
+    const sel = document.getElementById('meal-type');
+    sel.value = d.meal_suggestion;
+  }
+  document.getElementById('scan-result').style.display = 'block';
+
+  // Render macro donut
+  requestAnimationFrame(() => {
+    const ctx = document.getElementById('scanMacroDonut');
+    if (!ctx) return;
+    if (window._scanDonut) window._scanDonut.destroy();
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const pro = d.protein_per_100g || 0;
+    const carb = d.carbs_per_100g || 0;
+    const fat = d.fat_per_100g || 0;
+    const proKcal = pro * 4, carbKcal = carb * 4, fatKcal = fat * 9;
+    window._scanDonut = new Chart(ctx.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: [`Protein ${pro}g`, `Carbs ${carb}g`, `Fat ${fat}g`],
+        datasets: [{
+          data: [proKcal, carbKcal, fatKcal],
+          backgroundColor: ['rgba(96,165,250,.85)','rgba(251,191,36,.85)','rgba(167,139,250,.85)'],
+          borderWidth: 2,
+          borderColor: isDark ? '#1c2128' : '#fff'
+        }]
+      },
+      options: {
+        cutout: '60%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: isDark?'#cdd9e5':'#374151', font:{size:10,family:'DM Sans'}, padding:8, boxWidth:10 } }
+        }
+      }
+    });
+  });
+}
+
+async function logScannedFood() {
+  if (!scanResult || !scanResult.food_id) {
+    showToast('Could not log: no food ID found. Try scanning again.', 'danger'); return;
+  }
+  const qty = parseFloat(document.getElementById('serving-size').value) || 100;
+  const meal = document.getElementById('meal-type').value;
+  const r = await fetch('/api/log/quick', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ food_id: scanResult.food_id, quantity: qty, meal })
+  });
+  if (r.ok) {
+    showToast('✅ ' + scanResult.food_name + ' logged successfully!', 'success');
+    setTimeout(() => window.location = '/dashboard', 1500);
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('scan-error');
+  if (msg === 'groq_key_missing' || msg.includes('groq') || msg.includes('api key') || msg.includes('API key')) {
+    el.innerHTML = `
+      <div style="font-weight:700;margin-bottom:.5rem"><i class="fa fa-key"></i> Groq API key not set up</div>
+      <div style="font-size:.83rem;margin-bottom:.75rem">The AI Scanner needs a free Groq API key to work.</div>
+      <div style="font-size:.8rem;line-height:1.8">
+        <b>Quick setup:</b><br>
+        1. Get a free key at <a href="https://console.groq.com" target="_blank" style="color:var(--primary);font-weight:600">console.groq.com</a><br>
+        2. Copy <code style="background:var(--surface2);padding:.1rem .4rem;border-radius:4px">.env.example</code> → <code style="background:var(--surface2);padding:.1rem .4rem;border-radius:4px">.env</code><br>
+        3. Paste your key: <code style="background:var(--surface2);padding:.1rem .4rem;border-radius:4px">GROQ_API_KEY=gsk_...</code><br>
+        4. Restart Flask
+      </div>`;
+  } else {
+    el.innerHTML = '<i class="fa fa-circle-exclamation"></i> ' + msg;
+  }
+  el.style.display = 'block';
+  document.getElementById('scan-loading').style.display = 'none';
+}
+</script>
+{% endblock %}

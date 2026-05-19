@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Dashboard — Cal AI (Offline)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="/static/css/app.css"/>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#1db954"/>
+</head>
+<body>
+
+<div id="offlineBanner" style="background:linear-gradient(90deg,#b45309,#d97706);color:#fff;
+  font-size:.8rem;font-weight:600;padding:.45rem 1rem;text-align:center;letter-spacing:.01em;display:none">
+  <i class="fa fa-wifi-slash"></i>&nbsp; Offline Mode — data shown from last sync
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item active" href="/offline-dashboard"><i class="fa fa-home"></i><span>Home</span></a>
+  <a class="nav-item" href="/scan"><i class="fa fa-camera"></i><span>Scan</span></a>
+  <button class="nav-item" onclick="openLogModal()" style="background:none;border:none;flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:.5rem 0;color:var(--muted);font-size:.65rem;cursor:pointer">
+    <i class="fa fa-plus-circle"></i><span>Log</span>
+  </button>
+  <a class="nav-item" href="/analytics"><i class="fa fa-chart-line"></i><span>Analytics</span></a>
+  <a class="nav-item" href="/profile"><i class="fa fa-user"></i><span>Profile</span></a>
+</nav>
+
+<div class="app-shell" style="padding-bottom:80px">
+<div class="page-content" style="padding:1rem;max-width:480px;margin:0 auto">
+
+  <div style="margin-bottom:1rem">
+    <div style="font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-.02em">
+      Good day, <span id="greetName">—</span>! 👋
+    </div>
+    <div style="font-size:.8rem;color:var(--muted);margin-top:.15rem">Showing cached nutrition data</div>
+  </div>
+
+  <div class="calorie-hero" style="margin-bottom:1rem">
+    <div class="ring-wrap">
+      <svg width="110" height="110" viewBox="0 0 110 110">
+        <circle cx="55" cy="55" r="40" fill="none" stroke="var(--border)" stroke-width="9"/>
+        <circle id="ringArc" cx="55" cy="55" r="40" fill="none"
+          stroke="var(--primary)" stroke-width="9" stroke-linecap="round"
+          stroke-dasharray="0 251.3" transform="rotate(-90 55 55)"
+          style="transition:stroke-dasharray .8s ease"/>
+      </svg>
+      <div class="ring-center-text">
+        <span id="ringPct" class="ring-pct" style="color:var(--primary)">0%</span>
+      </div>
+    </div>
+    <div class="ring-stats">
+      <div class="ring-cal-big" id="calConsumed" style="color:var(--primary)">0</div>
+      <div class="ring-cal-label">kcal consumed today</div>
+      <div class="ring-remain" id="calRemain" style="color:var(--text2)">
+        <span style="color:var(--primary);font-family:var(--mono);font-weight:800" id="remainVal">—</span> kcal remaining
+      </div>
+      <div class="ring-row">
+        <div class="ring-row-item"><span class="rl">Goal</span><span class="rv" id="goalVal">—</span></div>
+        <div class="ring-row-item"><span class="rl">Food</span><span class="rv" id="foodVal">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="macro-pills" style="margin-bottom:1rem">
+    <div class="macro-pill">
+      <div class="mp-val" style="color:var(--blue)"><span id="macProt">0</span><span style="font-size:.8rem">g</span></div>
+      <div class="mp-label">Protein</div>
+      <div class="mp-bar"><div class="mp-fill" id="barProt" style="width:0%;background:var(--blue)"></div></div>
+    </div>
+    <div class="macro-pill">
+      <div class="mp-val" style="color:var(--accent)"><span id="macCarb">0</span><span style="font-size:.8rem">g</span></div>
+      <div class="mp-label">Carbs</div>
+      <div class="mp-bar"><div class="mp-fill" id="barCarb" style="width:0%;background:var(--accent)"></div></div>
+    </div>
+    <div class="macro-pill">
+      <div class="mp-val" style="color:var(--purple)"><span id="macFat">0</span><span style="font-size:.8rem">g</span></div>
+      <div class="mp-label">Fat</div>
+      <div class="mp-bar"><div class="mp-fill" id="barFat" style="width:0%;background:var(--purple)"></div></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header">
+      <span>🍽️ Today's Food Log</span>
+      <button onclick="openLogModal()" class="card-link"
+        style="background:none;border:none;cursor:pointer;color:var(--primary);font-size:.8rem;font-weight:600">
+        + Add food
+      </button>
+    </div>
+    <div id="todayLog">
+      <div style="text-align:center;padding:2.5rem 1rem">
+        <div style="font-size:3rem;margin-bottom:.75rem">🍽️</div>
+        <div style="font-weight:700;font-size:.95rem;color:var(--text2)">No food logged yet</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:.25rem">Tap "+ Add food" to log</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pendingBanner" style="display:none;background:var(--surface2);border:1px solid var(--border);
+    border-radius:.75rem;padding:.65rem 1rem;margin-bottom:1rem;font-size:.78rem;color:var(--muted);text-align:center">
+    <i class="fa fa-clock" style="color:var(--accent)"></i>
+    <span id="pendingCount">0</span> log(s) queued — will sync when back online
+  </div>
+
+  <div style="text-align:center;margin-top:.5rem;font-size:.75rem;color:var(--muted)">
+    <i class="fa fa-clock-rotate-left"></i>
+    Last synced: <span id="syncTime">never</span>
+    &nbsp;·&nbsp;
+    <a href="/login" style="color:var(--primary)">Switch account</a>
+  </div>
+
+  <div style="text-align:center;margin-top:.75rem;display:none" id="goOnlineBtn">
+    <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.4rem;
+      background:var(--primary);color:#000;font-size:.8rem;font-weight:700;
+      padding:.5rem 1.1rem;border-radius:999px;text-decoration:none">
+      <i class="fa fa-wifi"></i> Back online — Go to Dashboard
+    </a>
+  </div>
+
+</div>
+</div>
+
+<!-- Log Food Modal -->
+<div id="logModal" style="display:none;position:fixed;inset:0;z-index:999;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(3px)"
+  onclick="if(event.target===this)closeLogModal()">
+  <div style="position:absolute;bottom:0;left:0;right:0;background:var(--surface);
+    border-radius:1.25rem 1.25rem 0 0;padding:1.1rem 1rem 2rem;max-height:88vh;overflow-y:auto">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">
+      <div style="font-size:1rem;font-weight:800;color:var(--text)">✏️ Log Food</div>
+      <button onclick="closeLogModal()" style="background:none;border:none;font-size:1.3rem;
+        color:var(--muted);cursor:pointer;line-height:1">✕</button>
+    </div>
+
+    <div style="display:flex;gap:.35rem;margin-bottom:.75rem;overflow-x:auto;padding-bottom:2px">
+      <button class="mpill active" onclick="setMeal('Breakfast',this)">🌅 Breakfast</button>
+      <button class="mpill" onclick="setMeal('Lunch',this)">☀️ Lunch</button>
+      <button class="mpill" onclick="setMeal('Dinner',this)">🌙 Dinner</button>
+      <button class="mpill" onclick="setMeal('Snack',this)">🍎 Snack</button>
+    </div>
+
+    <input id="logSearch" type="text" placeholder="🔍 Search food (e.g. rice, chicken...)"
+      autocomplete="off" oninput="searchFoods(this.value)"
+      style="width:100%;padding:.6rem .85rem;border-radius:.65rem;border:1.5px solid var(--border);
+        background:var(--surface2);color:var(--text);font-size:.85rem;box-sizing:border-box;margin-bottom:.6rem;outline:none">
+
+    <div id="logFoodList" style="display:flex;flex-direction:column;gap:.35rem;max-height:200px;overflow-y:auto">
+      <div style="text-align:center;color:var(--muted);font-size:.8rem;padding:1.5rem 0">
+        Type to search your food database
+      </div>
+    </div>
+
+    <div id="selPanel" style="display:none;margin-top:.85rem;padding:.85rem;
+      background:var(--surface2);border-radius:.8rem;border:1.5px solid var(--primary)">
+      <div style="font-size:.88rem;font-weight:800;color:var(--text);margin-bottom:.6rem" id="selName">—</div>
+      <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <label style="font-size:.75rem;color:var(--muted)">Grams:</label>
+          <input id="logQty" type="number" value="100" min="1" max="2000" oninput="updatePreview()"
+            style="width:75px;padding:.35rem .55rem;border-radius:.4rem;border:1px solid var(--border);
+              background:var(--surface);color:var(--text);font-size:.9rem;font-weight:700;text-align:center">
+        </div>
+        <div style="font-size:.78rem;color:var(--muted)">
+          ≈ <span id="calPrev" style="color:var(--primary);font-weight:800;font-size:.95rem">0</span> kcal
+          &nbsp;P:<span id="protPrev" style="color:var(--blue);font-weight:700">0</span>g
+          &nbsp;C:<span id="carbPrev" style="color:var(--accent);font-weight:700">0</span>g
+          &nbsp;F:<span id="fatPrev" style="color:var(--purple);font-weight:700">0</span>g
+        </div>
+      </div>
+      <button onclick="submitLog()"
+        style="margin-top:.75rem;width:100%;padding:.7rem;border-radius:.65rem;border:none;
+          background:var(--primary);color:#000;font-weight:800;font-size:.9rem;cursor:pointer">
+        ✅ Log It
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+.mpill{padding:.32rem .75rem;border-radius:999px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);font-size:.73rem;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.mpill.active{background:var(--primary);color:#000;border-color:var(--primary)}
+.food-row{display:flex;align-items:center;gap:.6rem;padding:.55rem .7rem;border-radius:.6rem;background:var(--surface2);border:1px solid var(--border);cursor:pointer}
+.food-row:active{border-color:var(--primary)}
+</style>
+
+<script src="/static/js/offline-auth.js"></script>
+<script>
+const CIRC = 251.3;
+const CAT_ICON = {Filipino:'🇵🇭',Fruits:'🍎',Vegetables:'🥦',Protein:'🍗',Grains:'🍚',Dairy:'🥛',Snacks:'🍿',Beverages:'🥤'};
+const MEAL_ICON = {Breakfast:'🌅',Lunch:'☀️',Dinner:'🌙',Snack:'🍎'};
+
+let goalCalories = 2000;
+let selectedFood = null;
+let selectedMeal = 'Breakfast';
+let todayLogs    = [];
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async () => {
+  const offlineUser = JSON.parse(sessionStorage.getItem('offline_user') || 'null');
+  if (!offlineUser) { window.location.replace('/login'); return; }
+  document.getElementById('greetName').textContent =
+    offlineUser.username || offlineUser.email?.split('@')[0] || 'there';
+
+  const cached = await window.OfflineAuth.getCachedUserData('dashboard');
+  if (cached) {
+    goalCalories = cached.goal_calories || 2000;
+    todayLogs = (cached.today_logs || []).map(l => ({
+      name:l.name, calories:l.calories, protein:l.protein||0,
+      carbs:l.carbs||0, fat:l.fat||0, quantity:l.quantity,
+      meal_type:l.meal_type||'Snack', category:l.category||'General'
+    }));
+    renderAll();
+    const ts = await window.OfflineAuth.getCachedUserData('dashboard_ts');
+    if (ts) document.getElementById('syncTime').textContent =
+      new Date(ts).toLocaleString('en',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  }
+
+  refreshPending();
+
+  function updateBanner() {
+    document.getElementById('offlineBanner').style.display = navigator.onLine ? 'none':'block';
+    document.getElementById('goOnlineBtn').style.display   = navigator.onLine ? 'block':'none';
+  }
+  updateBanner();
+  window.addEventListener('online',  updateBanner);
+  window.addEventListener('offline', updateBanner);
+  window.addEventListener('online', async () => {
+    await window.OfflineAuth.syncFoodLogs?.();
+    refreshPending();
+  });
+})();
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderAll() {
+  const cal  = todayLogs.reduce((s,l)=>s+Math.round(l.calories       *l.quantity/100),0);
+  const prot = todayLogs.reduce((s,l)=>s+Math.round((l.protein||0)   *l.quantity/100),0);
+  const carb = todayLogs.reduce((s,l)=>s+Math.round((l.carbs||0)     *l.quantity/100),0);
+  const fat  = todayLogs.reduce((s,l)=>s+Math.round((l.fat||0)       *l.quantity/100),0);
+  const pct  = Math.min(Math.round(cal/goalCalories*100),100);
+  const rem  = goalCalories - cal;
+
+  document.getElementById('ringArc').setAttribute('stroke-dasharray',`${(pct/100*CIRC).toFixed(1)} ${CIRC}`);
+  document.getElementById('ringPct').textContent     = pct+'%';
+  document.getElementById('calConsumed').textContent = cal;
+  document.getElementById('goalVal').textContent     = goalCalories;
+  document.getElementById('foodVal').textContent     = cal;
+  document.getElementById('remainVal').textContent   = Math.abs(rem);
+  document.getElementById('calRemain').style.color   = rem<0?'var(--red)':'var(--text2)';
+  document.getElementById('macProt').textContent = prot;
+  document.getElementById('macCarb').textContent = carb;
+  document.getElementById('macFat').textContent  = fat;
+  document.getElementById('barProt').style.width = Math.min(prot/150*100,100)+'%';
+  document.getElementById('barCarb').style.width = Math.min(carb/200*100,100)+'%';
+  document.getElementById('barFat').style.width  = Math.min(fat/70*100,100)+'%';
+
+  if (!todayLogs.length) {
+    document.getElementById('todayLog').innerHTML = `
+      <div style="text-align:center;padding:2.5rem 1rem">
+        <div style="font-size:3rem;margin-bottom:.75rem">🍽️</div>
+        <div style="font-weight:700;font-size:.95rem;color:var(--text2)">No food logged yet</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-top:.25rem">Tap "+ Add food" to log</div>
+      </div>`; return;
+  }
+  let html='';
+  ['Breakfast','Lunch','Dinner','Snack'].forEach(meal=>{
+    const logs=todayLogs.filter(l=>l.meal_type===meal);
+    if(!logs.length)return;
+    const mc=logs.reduce((s,l)=>s+Math.round(l.calories*l.quantity/100),0);
+    html+=`<div class="log-meal-section">
+      <div class="log-meal-header">
+        <span class="log-meal-icon">${MEAL_ICON[meal]}</span>
+        <span class="log-meal-title">${meal}</span>
+        <span class="log-meal-kcal">${mc} kcal</span>
+      </div>`;
+    logs.forEach(l=>{
+      const k=Math.round(l.calories*l.quantity/100);
+      html+=`<div class="log-item">
+        <div class="log-food-icon">${CAT_ICON[l.category]||'🍽️'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="log-food-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name}</div>
+          <div class="log-food-qty">${Math.round(l.quantity)}g</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-right:.25rem">
+          <div class="log-food-cal">${k}</div>
+          <div style="font-size:.68rem;color:var(--muted)">kcal</div>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  document.getElementById('todayLog').innerHTML=html;
+}
+
+async function refreshPending() {
+  const p = await window.OfflineAuth.getPendingFoodLogs?.() || [];
+  const b = document.getElementById('pendingBanner');
+  if (p.length) { document.getElementById('pendingCount').textContent=p.length; b.style.display='block'; }
+  else b.style.display='none';
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openLogModal() {
+  document.getElementById('logModal').style.display='block';
+  document.body.style.overflow='hidden';
+  setTimeout(()=>document.getElementById('logSearch').focus(),200);
+}
+function closeLogModal() {
+  document.getElementById('logModal').style.display='none';
+  document.body.style.overflow='';
+  selectedFood=null;
+  document.getElementById('logSearch').value='';
+  document.getElementById('logFoodList').innerHTML=
+    '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:1.5rem 0">Type to search your food database</div>';
+  document.getElementById('selPanel').style.display='none';
+}
+function setMeal(meal,el) {
+  selectedMeal=meal;
+  document.querySelectorAll('.mpill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+let st;
+function searchFoods(q) {
+  clearTimeout(st);
+  if(!q||q.length<2){
+    document.getElementById('logFoodList').innerHTML=
+      '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:1.5rem 0">Type at least 2 characters</div>';
+    return;
+  }
+  st=setTimeout(async()=>{
+    const res=await window.OfflineAuth.searchCachedFoods(q,'');
+    if(!res||!res.length){
+      document.getElementById('logFoodList').innerHTML=
+        '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:1rem 0">No foods found in offline cache</div>';
+      return;
+    }
+    document.getElementById('logFoodList').innerHTML=res.slice(0,20).map(f=>`
+      <div class="food-row" onclick='selectFood(${JSON.stringify(f)})'>
+        <div style="font-size:1.1rem;flex-shrink:0">${CAT_ICON[f.category]||'🍽️'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.83rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
+          <div style="font-size:.7rem;color:var(--muted)">${f.calories} kcal · P:${f.protein||0}g C:${f.carbs||0}g F:${f.fat||0}g (per 100g)</div>
+        </div>
+      </div>`).join('');
+  },280);
+}
+
+function selectFood(food) {
+  selectedFood=food;
+  document.getElementById('selName').textContent=food.name;
+  document.getElementById('logQty').value=100;
+  document.getElementById('selPanel').style.display='block';
+  updatePreview();
+  document.getElementById('selPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function updatePreview() {
+  if(!selectedFood)return;
+  const q=parseFloat(document.getElementById('logQty').value)||0;
+  document.getElementById('calPrev').textContent  = Math.round(selectedFood.calories     *q/100);
+  document.getElementById('protPrev').textContent = Math.round((selectedFood.protein||0) *q/100);
+  document.getElementById('carbPrev').textContent = Math.round((selectedFood.carbs||0)   *q/100);
+  document.getElementById('fatPrev').textContent  = Math.round((selectedFood.fat||0)     *q/100);
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function submitLog() {
+  if(!selectedFood)return;
+  const qty=parseFloat(document.getElementById('logQty').value)||100;
+
+  await window.OfflineAuth.queueFoodLog({
+    food_id:selectedFood.id, food_name:selectedFood.name,
+    quantity:qty, meal_type:selectedMeal,
+    logged_at:new Date().toISOString().slice(0,19).replace('T',' ')
+  });
+
+  todayLogs.push({
+    name:selectedFood.name, calories:selectedFood.calories,
+    protein:selectedFood.protein||0, carbs:selectedFood.carbs||0, fat:selectedFood.fat||0,
+    quantity:qty, meal_type:selectedMeal, category:selectedFood.category||'General'
+  });
+
+  renderAll();
+  refreshPending();
+  closeLogModal();
+  showToast(`✅ ${selectedFood.name} logged (${qty}g)`);
+}
+
+function showToast(msg) {
+  const t=document.createElement('div');
+  t.textContent=msg;
+  Object.assign(t.style,{position:'fixed',bottom:'90px',left:'50%',transform:'translateX(-50%)',
+    background:'var(--text)',color:'var(--bg)',padding:'.55rem 1.1rem',borderRadius:'20px',
+    fontSize:'.82rem',fontWeight:'700',zIndex:'9999',whiteSpace:'nowrap',
+    boxShadow:'0 4px 16px rgba(0,0,0,.3)',transition:'opacity .3s'});
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},2200);
+}
+</script>
+</body>
+</html>

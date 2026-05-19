@@ -1,0 +1,323 @@
+{% extends 'base.html' %}
+{% block title %}Meal Planner{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:1rem">
+  <div style="font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-.02em">🗓️ Meal Planner</div>
+  <div style="font-size:.8rem;color:var(--muted);margin-top:.15rem">AI-powered weekly meal plans — browse, edit & save</div>
+</div>
+
+<!-- Week navigator -->
+<div class="planner-week-nav">
+  <button class="planner-nav-btn" onclick="shiftWeek(-1)"><i class="fa fa-chevron-left"></i></button>
+  <div style="text-align:center">
+    <div class="planner-week-title" id="weekLabel">This Week</div>
+    <div style="font-size:.72rem;color:var(--muted)" id="weekRange"></div>
+  </div>
+  <button class="planner-nav-btn" onclick="shiftWeek(1)"><i class="fa fa-chevron-right"></i></button>
+</div>
+
+<!-- Day tabs -->
+<div class="day-tabs" id="dayTabs"></div>
+
+<!-- Day plan view -->
+<div id="dayPlanView"></div>
+
+<!-- Generate new plan -->
+<div class="card" style="margin-top:1rem">
+  <div class="card-header"><span>🤖 Generate AI Meal Plan</span></div>
+  <div class="card-body">
+    <!-- Groq info banner -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.85rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.65rem">
+      <span style="font-size:1.2rem;flex-shrink:0">🦙</span>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.6">
+        <strong style="color:var(--text)">Powered by Groq + Llama 3.3</strong> — Requires a free Groq API key.<br>
+        Get yours at <a href="https://console.groq.com" target="_blank" style="color:var(--primary);font-weight:600">console.groq.com</a>, then add <code style="background:var(--border);padding:.05rem .3rem;border-radius:4px;font-size:.75rem">GROQ_API_KEY=gsk_...</code> to your <code style="background:var(--border);padding:.05rem .3rem;border-radius:4px;font-size:.75rem">.env</code> file.
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+      <div class="form-group" style="margin-bottom:.65rem">
+        <label class="form-label">Duration</label>
+        <select id="planDays" class="form-select">
+          <option value="1">1 day</option>
+          <option value="3" selected>3 days</option>
+          <option value="5">5 days</option>
+          <option value="7">1 week</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:.65rem">
+        <label class="form-label">Diet Type</label>
+        <select id="planDiet" class="form-select">
+          <option value="balanced">Balanced</option>
+          <option value="high-protein">High Protein</option>
+          <option value="low-carb">Low Carb</option>
+          <option value="vegetarian">Vegetarian</option>
+          <option value="budget">Budget-Friendly</option>
+          <option value="traditional-filipino">Filipino</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:.75rem">
+      <label class="form-label">Preferences / Allergies</label>
+      <input type="text" id="planPrefs" class="form-control" placeholder="e.g. no seafood, prefer grilled..."/>
+    </div>
+    <button class="btn-primary w-100" onclick="generatePlan()" id="genBtn">
+      <i class="fa fa-wand-magic-sparkles"></i> Generate Plan
+    </button>
+  </div>
+</div>
+
+<div id="planLoading" style="display:none;text-align:center;padding:2rem">
+  <div class="spinner" style="margin:0 auto .75rem"></div>
+  <div style="color:var(--muted);font-size:.88rem">Generating your personalized plan… 🤖</div>
+</div>
+<div id="planError" class="alert alert-danger" style="display:none;margin-top:.75rem"></div>
+
+<!-- Edit modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--surface);border-radius:var(--radius);width:100%;max-width:400px;box-shadow:var(--shadow-lg);overflow:hidden">
+    <div style="padding:1rem 1.15rem;border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between;align-items:center">
+      <span>✏️ Edit Meal</span>
+      <button class="btn-icon" onclick="closeEdit()"><i class="fa fa-xmark"></i></button>
+    </div>
+    <div style="padding:1.1rem">
+      <div class="form-group">
+        <label class="form-label">Meal Name</label>
+        <input type="text" id="editName" class="form-control"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+        <div class="form-group"><label class="form-label">Calories</label><input type="number" id="editCal" class="form-control"/></div>
+        <div class="form-group"><label class="form-label">Protein (g)</label><input type="number" id="editProt" class="form-control"/></div>
+        <div class="form-group"><label class="form-label">Carbs (g)</label><input type="number" id="editCarb" class="form-control"/></div>
+        <div class="form-group"><label class="form-label">Fat (g)</label><input type="number" id="editFat" class="form-control"/></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Notes</label>
+        <input type="text" id="editNotes" class="form-control" placeholder="Optional notes..."/>
+      </div>
+    </div>
+    <div style="padding:.9rem 1.15rem;border-top:1px solid var(--border);display:flex;gap:.5rem">
+      <button class="btn-ghost" onclick="closeEdit()" style="flex:1">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()" style="flex:2"><i class="fa fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const PLAN_KEY = 'cal-ai-meal-plan';
+const WEEK_KEY = 'cal-ai-week-offset';
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MEAL_TYPES = ['breakfast','lunch','dinner','snack'];
+const MEAL_ICONS = { breakfast:'🌅', lunch:'☀️', dinner:'🌙', snack:'🍎' };
+
+let weekOffset = parseInt(localStorage.getItem(WEEK_KEY) || '0');
+let planData   = JSON.parse(localStorage.getItem(PLAN_KEY) || '{}');
+let activeDayIdx = new Date().getDay();
+let editTarget = null;
+
+/* ── Date helpers ── */
+function getWeekDates(offset) {
+  const today = new Date();
+  const dow = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - dow + (offset * 7));
+  return Array.from({length:7}, (_,i) => {
+    const d = new Date(monday); d.setDate(monday.getDate()+i); return d;
+  });
+}
+function dateKey(d) { return d.toISOString().slice(0,10); }
+function fmtDate(d) { return d.toLocaleDateString('en',{month:'short',day:'numeric'}); }
+
+/* ── Render week nav ── */
+function renderWeekNav() {
+  const dates = getWeekDates(weekOffset);
+  const label = document.getElementById('weekLabel');
+  const range = document.getElementById('weekRange');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const thisWeekStart = new Date(today); thisWeekStart.setDate(today.getDate()-today.getDay());
+  const viewStart = new Date(dates[0]); viewStart.setHours(0,0,0,0);
+  if (viewStart.getTime() === thisWeekStart.getTime()) label.textContent = 'This Week';
+  else if (weekOffset < 0) label.textContent = 'Past Week';
+  else label.textContent = 'Future Week';
+  range.textContent = fmtDate(dates[0]) + ' – ' + fmtDate(dates[6]);
+}
+
+/* ── Render day tabs ── */
+function renderDayTabs() {
+  const dates = getWeekDates(weekOffset);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tabs = document.getElementById('dayTabs');
+  tabs.innerHTML = dates.map((d,i) => {
+    const isToday = d.setHours(0,0,0,0) === today.getTime();
+    const isActive = i === activeDayIdx;
+    return `<div class="day-tab ${isActive?'active':''}" onclick="selectDay(${i})">
+      <span class="dt-name">${DAYS[d.getDay()]}</span>
+      <span class="dt-num">${d.getDate()}</span>
+      ${isToday && !isActive ? '<span style="width:4px;height:4px;border-radius:50%;background:var(--primary);margin-top:2px"></span>':''}
+    </div>`;
+  }).join('');
+}
+
+/* ── Render day plan ── */
+function renderDayPlan() {
+  const dates = getWeekDates(weekOffset);
+  const d = dates[activeDayIdx];
+  const key = dateKey(d);
+  const day = planData[key] || {};
+  const view = document.getElementById('dayPlanView');
+  const totalCal = MEAL_TYPES.reduce((s,m) => s + (day[m]?.calories||0), 0);
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem">
+    <div style="font-size:.82rem;color:var(--muted)">${d.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'})}</div>
+    ${totalCal ? `<div style="font-size:.82rem;font-weight:700;color:var(--primary);font-family:var(--mono)">${totalCal} kcal total</div>` : ''}
+  </div>`;
+
+  MEAL_TYPES.forEach(m => {
+    const meal = day[m];
+    html += `<div class="plan-meal-card">
+      <div class="plan-meal-type">${MEAL_ICONS[m]} ${m.charAt(0).toUpperCase()+m.slice(1)}</div>`;
+    if (meal) {
+      html += `<div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1">
+          <div class="plan-meal-name">${meal.name}</div>
+          <div class="plan-meal-meta">${meal.calories||0} kcal · ${meal.protein||0}g P · ${meal.carbs||0}g C · ${meal.fat||0}g F</div>
+          ${meal.notes ? `<div style="font-size:.72rem;color:var(--muted);margin-top:.2rem;font-style:italic">${meal.notes}</div>` : ''}
+        </div>
+        <button class="plan-edit-btn" onclick="openEdit('${key}','${m}')"><i class="fa fa-pen"></i></button>
+      </div>`;
+    } else {
+      html += `<div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.82rem;color:var(--muted2);font-style:italic">No meal planned</span>
+        <button class="plan-edit-btn" onclick="openEdit('${key}','${m}')"><i class="fa fa-plus"></i> Add</button>
+      </div>`;
+    }
+    html += `</div>`;
+  });
+
+  view.innerHTML = html;
+}
+
+function selectDay(i) {
+  activeDayIdx = i;
+  renderDayTabs();
+  renderDayPlan();
+}
+
+function shiftWeek(delta) {
+  weekOffset += delta;
+  localStorage.setItem(WEEK_KEY, weekOffset);
+  activeDayIdx = delta > 0 ? 0 : 6;
+  renderWeekNav();
+  renderDayTabs();
+  renderDayPlan();
+}
+
+/* ── Edit modal ── */
+function openEdit(dayKey, mealType) {
+  editTarget = { dayKey, mealType };
+  const meal = (planData[dayKey] || {})[mealType] || {};
+  document.getElementById('editName').value  = meal.name || '';
+  document.getElementById('editCal').value   = meal.calories || '';
+  document.getElementById('editProt').value  = meal.protein || '';
+  document.getElementById('editCarb').value  = meal.carbs || '';
+  document.getElementById('editFat').value   = meal.fat || '';
+  document.getElementById('editNotes').value = meal.notes || '';
+  document.getElementById('editModal').style.display = 'flex';
+}
+function closeEdit() {
+  document.getElementById('editModal').style.display = 'none';
+  editTarget = null;
+}
+function saveEdit() {
+  if (!editTarget) return;
+  const {dayKey, mealType} = editTarget;
+  if (!planData[dayKey]) planData[dayKey] = {};
+  const name = document.getElementById('editName').value.trim();
+  if (!name) { delete planData[dayKey][mealType]; }
+  else {
+    planData[dayKey][mealType] = {
+      name,
+      calories: parseInt(document.getElementById('editCal').value) || 0,
+      protein:  parseInt(document.getElementById('editProt').value) || 0,
+      carbs:    parseInt(document.getElementById('editCarb').value) || 0,
+      fat:      parseInt(document.getElementById('editFat').value) || 0,
+      notes:    document.getElementById('editNotes').value.trim(),
+    };
+  }
+  localStorage.setItem(PLAN_KEY, JSON.stringify(planData));
+  closeEdit();
+  renderDayPlan();
+}
+
+/* ── AI plan generation ── */
+async function generatePlan() {
+  const days = parseInt(document.getElementById('planDays').value);
+  const diet = document.getElementById('planDiet').value;
+  const prefs = document.getElementById('planPrefs').value;
+  const btn = document.getElementById('genBtn');
+  const loading = document.getElementById('planLoading');
+  const errEl = document.getElementById('planError');
+
+  btn.disabled = true;
+  loading.style.display = 'block';
+  errEl.style.display = 'none';
+
+  try {
+    const r = await fetch('/api/meal-plan', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ days, diet_type: diet, preferences: prefs })
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) {
+      const errMsg = data.error || `Server error ${r.status}`;
+      if (errMsg === 'groq_key_missing' || errMsg.toLowerCase().includes('groq') || errMsg.toLowerCase().includes('api key')) {
+        errEl.innerHTML = `
+          <div style="font-weight:700;margin-bottom:.4rem"><i class="fa fa-key"></i> Groq API key not configured</div>
+          <div style="font-size:.82rem;margin-bottom:.65rem">The AI Meal Planner needs a free Groq API key to generate plans.</div>
+          <div style="font-size:.79rem;line-height:2">
+            <b>Setup steps:</b><br>
+            1. Get a free key at <a href="https://console.groq.com" target="_blank" style="color:var(--primary);font-weight:700">console.groq.com</a><br>
+            2. Copy <code style="background:var(--surface2);padding:.1rem .35rem;border-radius:4px">.env.example</code> → <code style="background:var(--surface2);padding:.1rem .35rem;border-radius:4px">.env</code><br>
+            3. Add your key: <code style="background:var(--surface2);padding:.1rem .35rem;border-radius:4px">GROQ_API_KEY=gsk_...</code><br>
+            4. Restart Flask and try again
+          </div>`;
+      } else {
+        errEl.innerHTML = '<i class="fa fa-circle-exclamation"></i> ' + errMsg;
+      }
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Save AI plan into local planData starting from current week's active day
+    const dates = getWeekDates(weekOffset);
+    let startDayIdx = activeDayIdx;
+    data.plan.forEach((dayPlan, i) => {
+      const targetDate = new Date(dates[Math.min(startDayIdx + i, 6)]);
+      const key = dateKey(targetDate);
+      planData[key] = {};
+      Object.entries(dayPlan.meals).forEach(([mtype, meal]) => {
+        if (meal) planData[key][mtype] = meal;
+      });
+    });
+    localStorage.setItem(PLAN_KEY, JSON.stringify(planData));
+    renderDayPlan();
+    window.addNotif && addNotif('Meal Plan Ready!', `${days}-day plan saved to your calendar.`, '🤖');
+  } catch(e) {
+    errEl.textContent = '❌ ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    loading.style.display = 'none';
+  }
+}
+
+/* ── Init ── */
+renderWeekNav();
+renderDayTabs();
+renderDayPlan();
+</script>
+{% endblock %}
